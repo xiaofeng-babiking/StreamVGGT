@@ -36,21 +36,37 @@ causal attention and leverages cached memory token to support efficient incremen
 
 ### Installation
 
+We use [uv](https://docs.astral.sh/uv/) to manage Python dependencies. Install it first:
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
 1. Clone StreamVGGT
 ```bash
 git clone https://github.com/wzzheng/StreamVGGT.git
 cd StreamVGGT
 ```
-2. Create conda environment
+
+2. Install system-level build tools (cmake + OpenMP runtime) — these are not Python packages, so uv does not manage them. With conda:
 ```bash
-conda create -n StreamVGGT python=3.11 cmake=3.14.0
-conda activate StreamVGGT 
+conda install -c conda-forge 'cmake>=3.14' 'llvm-openmp<16'
+```
+Or with apt on Debian/Ubuntu:
+```bash
+sudo apt-get install -y cmake libomp-dev
 ```
 
-3. Install requirements
+3. Sync Python dependencies (PyTorch comes from the `cu121` wheel index, configured in `pyproject.toml`):
 ```bash
-pip install -r requirements.txt
-conda install 'llvm-openmp<16'
+uv sync
+```
+This creates a `.venv/` in the project root and installs all core deps from `uv.lock`. To work inside it, either prefix commands with `uv run` or activate it with `source .venv/bin/activate`.
+
+To also install optional dependency groups:
+```bash
+uv sync --extra demo        # for demo_gradio.py
+uv sync --extra pose-eval   # for camera pose evaluation
+uv sync --all-extras        # everything
 ```
 
 ### Download Checkpoints
@@ -149,13 +165,11 @@ bash eval/mv_recon/run.sh
 Results will be saved in `eval_results/mv_recon/${model_name}_${ckpt_name}/logs_all.txt`.
 
 ### Camera Pose Estimation
-1. Install the required dependencies:
+1. Install the required dependencies (`pycolmap` and `pyceres` are in the `pose-eval` extra; LightGlue is a git checkout):
 ```bash
-pip install pycolmap==3.10.0 pyceres==2.3
+uv sync --extra pose-eval
 git clone https://github.com/cvg/LightGlue.git
-cd LightGlue
-python -m pip install -e .
-cd ..
+uv pip install -e ./LightGlue
 ```
 2. Please refer to [VGGT](https://github.com/facebookresearch/vggt) to prepare the co3d dataset.
 
@@ -167,8 +181,8 @@ python eval/pose_evaluation/test_co3d.py --co3d_dir /YOUR/CO3D/PATH --co3d_anno_
 ## Demo
 We provide a demo for StreamVGGT, based on the demo code from [VGGT](https://github.com/facebookresearch/vggt). You can follow the instructions below to launch it locally or try it out directly on [Hugging Face](https://huggingface.co/spaces/lch01/StreamVGGT).
 ```bash
-pip install -r requirements_demo.txt
-python demo_gradio.py
+uv sync --extra demo
+uv run python demo_gradio.py
 ```
 
 **Note**: While StreamVGGT typically reconstructs a scene in under one second, 3D point visualization may take much longer due to slower third-party rendering.

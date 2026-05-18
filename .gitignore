@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+!lib/gsplat_cuda.so
+*.egg-info/
+*.egg
+build/
+dist/
+
+# uv
+.venv/
+.python-version.local
+
+# Editors
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Project artifacts
+ckpt/
+data/
+eval_results/
+wandb/
+outputs/
+.hydra/
+*.log
