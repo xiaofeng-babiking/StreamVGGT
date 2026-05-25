@@ -533,6 +533,11 @@ def train_one_epoch(
                         continue
                     log_writer.add_scalar("train_" + name, val, step)
 
+                # Heartbeat for the orchestrator's hang watchdog (svggt_orch.heartbeat).
+                Path(args.output_dir, "heartbeat").write_text(
+                    f"{time.time()} {step}\n"
+                )
+
         if (
             data_iter_step % int(args.save_freq * len(data_loader)) == 0
             and data_iter_step != 0
