@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Tiny wrapper that runs the svggt_orch CLI with PYTHONPATH=src.
+# pyproject.toml uses `package = false`, so we can't `pip install` the package;
+# this avoids needing to.
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+venv="${repo_root}/.venv"
+
+if [[ ! -d "${venv}" ]]; then
+  echo "error: ${venv} not found. Run scripts/bootstrap_venv.sh first." >&2
+  exit 1
+fi
+
+export PYTHONPATH="${repo_root}/src${PYTHONPATH:+:${PYTHONPATH}}"
+exec "${venv}/bin/python" -m svggt_orch "$@"

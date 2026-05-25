@@ -33,3 +33,11 @@ docs/
 
 # Git worktrees (created by superpowers:using-git-worktrees)
 .worktrees/
+
+# Orchestrator runtime artifacts
+workflows/jobs/
+workflows/nodes.json
+
+# Test/type cache
+.pytest_cache/
+.mypy_cache/
