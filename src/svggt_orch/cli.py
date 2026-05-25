@@ -54,8 +54,9 @@ def launch(ctx: click.Context, dry_run: bool, exp_name: "str | None") -> None:
 @click.pass_context
 def tail(ctx: click.Context, job_id: str) -> None:
     """Stream per-rank logs from all worker containers."""
-    click.echo(f"tail {job_id}: not implemented yet", err=True)
-    ctx.exit(2)
+    from svggt_orch.supervise import run_tail
+    code = run_tail(ctx.obj["config_path"], job_id)
+    ctx.exit(code)
 
 
 @main.command()
