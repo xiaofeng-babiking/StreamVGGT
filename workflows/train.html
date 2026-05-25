@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>StreamVGGT — Multi-Node Distillation Walkthrough</title>
+<style>
+  :root {
+    --fg: #1a1a1a;
+    --fg-muted: #555;
+    --bg: #fafafa;
+    --bg-elev: #fff;
+    --accent: #0b6e4f;
+    --accent-bg: #e7f5ee;
+    --warn: #b54708;
+    --warn-bg: #fff4e5;
+    --danger: #b42318;
+    --danger-bg: #fee4e2;
+    --code-bg: #1f2937;
+    --code-fg: #e5e7eb;
+    --rule: #e2e2e2;
+    --rank-cyan: #0891b2;
+    --rank-mag: #c026d3;
+    --rank-yel: #d97706;
+    --rank-grn: #16a34a;
+  }
+  html { box-sizing: border-box; }
+  *, *::before, *::after { box-sizing: inherit; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: var(--fg); background: var(--bg);
+    line-height: 1.55; margin: 0; padding: 0;
+    font-size: 15px;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 32px 24px 96px; }
+  header { border-bottom: 1px solid var(--rule); margin-bottom: 24px; padding-bottom: 16px; }
+  h1 { font-size: 26px; margin: 0 0 4px; }
+  h2 { font-size: 20px; margin: 40px 0 10px; padding-top: 10px; border-top: 1px solid var(--rule); }
+  h3 { font-size: 16px; margin: 22px 0 8px; color: var(--fg); }
+  h4 { font-size: 14px; margin: 16px 0 6px; color: var(--fg-muted); }
+  p, ul, ol { margin: 8px 0; }
+  ul, ol { padding-left: 22px; }
+  li { margin: 4px 0; }
+  code, pre, kbd { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 13px; }
+  code:not(pre code) { background: #eef0f3; padding: 1px 5px; border-radius: 3px; }
+  pre {
+    background: var(--code-bg); color: var(--code-fg);
+    padding: 12px 14px; border-radius: 6px;
+    overflow-x: auto; line-height: 1.5;
+    font-size: 12.5px;
+  }
+  pre.sample-output { background: #0f172a; }
+  pre .c-r { color: #a3e635; }
+  pre .c-y { color: #fbbf24; }
+  pre .c-b { color: #60a5fa; }
+  pre .c-m { color: #f472b6; }
+  pre .c-red { color: #f87171; }
+  pre .c-dim { color: #9ca3af; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 13.5px; }
+  th, td { border: 1px solid var(--rule); padding: 8px 10px; text-align: left; vertical-align: top; }
+  th { background: #f0f3f6; font-weight: 600; }
+  .toc {
+    background: var(--bg-elev); border: 1px solid var(--rule);
+    padding: 12px 18px; border-radius: 6px; margin: 16px 0 28px;
+  }
+  .toc h3 { margin: 0 0 6px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--fg-muted); }
+  .toc ol { columns: 2; column-gap: 32px; padding-left: 18px; }
+  .toc a { color: var(--accent); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+  .callout {
+    border-left: 3px solid var(--accent);
+    background: var(--accent-bg);
+    padding: 10px 14px; margin: 14px 0;
+    border-radius: 0 4px 4px 0;
+  }
+  .callout.warn { border-color: var(--warn); background: var(--warn-bg); }
+  .callout.danger { border-color: var(--danger); background: var(--danger-bg); }
+  .callout strong { display: block; margin-bottom: 4px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+  }
+  details {
+    background: var(--bg-elev); border: 1px solid var(--rule);
+    border-radius: 6px; padding: 8px 14px; margin: 8px 0;
+  }
+  details summary {
+    cursor: pointer; font-weight: 600; padding: 4px 0;
+    color: var(--accent);
+  }
+  details[open] summary { margin-bottom: 8px; }
+  svg.diagram { background: var(--bg-elev); border: 1px solid var(--rule); border-radius: 6px; display: block; margin: 14px 0; }
+  .phase-badge {
+    display: inline-block; background: var(--accent); color: white;
+    padding: 2px 8px; border-radius: 3px; font-size: 12px; font-weight: 600;
+    letter-spacing: 0.5px; margin-right: 6px;
+  }
+  .phase-badge.b { background: #6366f1; }
+  .phase-badge.c { background: #0891b2; }
+  .phase-badge.d { background: #16a34a; }
+  .phase-badge.e { background: #d97706; }
+  .phase-badge.f { background: #6b7280; }
+  hr { border: none; border-top: 1px solid var(--rule); margin: 28px 0; }
+  footer { color: var(--fg-muted); font-size: 12px; margin-top: 48px; text-align: center; }
+  .kbd {
+    display: inline-block; background: #f0f3f6; border: 1px solid #d1d5db;
+    border-radius: 3px; padding: 0 5px; font-size: 11.5px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>StreamVGGT — Multi-Node Distillation Walkthrough</h1>
+  <p style="color: var(--fg-muted); margin: 0;">
+    Step-by-step operator guide for the <code>svggt_orch</code> orchestrator.
+    Covers bootstrap → discover → launch → monitor → cleanup across 5–16 nodes of 6× A100 PCIe GPUs sharing <code>/jfs</code> (JuiceFS).
+  </p>
+</header>
+
+<div class="toc">
+  <h3>Contents</h3>
+  <ol>
+    <li><a href="#overview">Overview</a></li>
+    <li><a href="#prereqs">Prerequisites</a></li>
+    <li><a href="#arch">Architecture</a></li>
+    <li><a href="#phase-a">Phase A — Bootstrap</a></li>
+    <li><a href="#phase-b">Phase B — Discover</a></li>
+    <li><a href="#phase-c">Phase C — Launch</a></li>
+    <li><a href="#phase-d">Phase D — Training (steady state)</a></li>
+    <li><a href="#phase-e">Phase E — Monitoring</a></li>
+    <li><a href="#phase-f">Phase F — Cleanup</a></li>
+    <li><a href="#errors">Error handling &amp; recovery</a></li>
+    <li><a href="#reference">CLI quick reference</a></li>
+    <li><a href="#smoke">L4 smoke checklist</a></li>
+  </ol>
+</div>
+
+<!-- ────────────────────────────────────────────── -->
+<h2 id="overview">1. Overview</h2>
+
+<p>
+  This page is a runbook for launching <strong>VGGT → StreamVGGT distillation training</strong>
+  across multiple nodes. The orchestrator (<code>svggt_orch</code>) is a Python package that uses
+  <code>asyncssh</code> to fan-out <code>docker run</code> commands to a pool of worker nodes,
+  each running <code>accelerate launch</code> inside a container that bind-mounts the
+  shared <code>/jfs</code>-resident uv venv.
+</p>
+
+<p>What you get out of one launch:</p>
+<ul>
+  <li>One <strong>training job</strong> with a stable world size (no elastic membership).</li>
+  <li>Per-rank logs streamed back to the head node via SSH.</li>
+  <li>A live TUI dashboard with GPU utilization, IB throughput, and a heartbeat staleness signal.</li>
+  <li>TensorBoard wired to the shared <code>checkpoints/&lt;exp_name&gt;/logs</code> directory.</li>
+  <li>Auto-resume from <code>checkpoint-last.pth</code> if the job is restarted.</li>
+</ul>
+
+<div class="callout">
+  <strong>Why this exists</strong>
+  The upstream <code>accelerate launch --multi_gpu</code> only handles a single node.
+  Multi-node DDP requires coordinated launches with matching <code>--machine_rank</code>,
+  consistent <code>MASTER_ADDR/PORT</code>, NCCL config aware of the IB fabric, and a way
+  to discover idle GPUs across the pool. This orchestrator wraps all of that in seven
+  subcommands.
+</div>
+
+<!-- ────────────────────────────────────────────── -->
+<h2 id="prereqs">2. Prerequisites</h2>
+
+<table>
+  <tr><th>Requirement</th><th>Why</th></tr>
+  <tr>
+    <td><code>uv</code> on the head node's <code>$PATH</code></td>
+    <td><code>bootstrap_venv.sh</code> uses it to populate <code>/jfs/.../.venv</code>.</td>
+  </tr>
+  <tr>
+    <td>SSH key trust from head → all workers (no password prompt)</td>
+    <td><code>asyncssh.connect(..., known_hosts=None)</code> trusts-on-first-use but still needs a key.</td>
+  </tr>
+  <tr>
+    <td><code>/jfs</code> mounted on every node at the same path</td>
+    <td>The orchestrator bind-mounts <code>/jfs</code> into containers; train.py reads
+        <code>data/train/processed_*</code> from there.</td>
+  </tr>
+  <tr>
+    <td>Docker daemon running, host user in the <code>docker</code> group</td>
+    <td>Workers exec <code>docker run -d</code> on each node.</td>
+  </tr>
+  <tr>
+    <td><code>babiking/ubuntu:12.8.1-cudnn-devel-ubuntu24.04</code> pulled on every node</td>
+    <td>The orchestrator does not pre-pull; first <code>launch</code> waits.</td>
+  </tr>
+  <tr>
+    <td>Mellanox IB <code>mlx5_1</code> ACTIVE on every node</td>
+    <td>NCCL data plane uses IB. <code>mlx5_0</code> is currently DOWN cluster-wide;
+        if you fix it, edit <code>workflows/cluster.yaml#nccl.ib_hca</code>.</td>
+  </tr>
+</table>
+
+<!-- ────────────────────────────────────────────── -->
+<h2 id="arch">3. Architecture</h2>
+
+<svg class="diagram" viewBox="0 0 900 460" width="100%" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Architecture: head node, N workers, JFS, fabrics">
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#374151"/>
+    </marker>
+    <marker id="ar-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#0b6e4f"/>
+    </marker>
+    <marker id="ar-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#b42318"/>
+    </marker>
+  </defs>
+
+  <!-- Head node -->
+  <rect x="340" y="20" width="220" height="100" rx="6" fill="#e7f5ee" stroke="#0b6e4f" stroke-width="1.5"/>
+  <text x="450" y="45" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="600">HEAD NODE</text>
+  <text x="450" y="65" text-anchor="middle" font-family="monospace" font-size="11">scripts/svggt-orch &lt;cmd&gt;</text>
+  <text x="450" y="82" text-anchor="middle" font-family="monospace" font-size="11">src/svggt_orch/ (Python)</text>
+  <text x="450" y="100" text-anchor="middle" font-family="monospace" font-size="11">workflows/{nodes,jobs/}.json</text>
+
+  <!-- Worker nodes -->
+  <g font-family="monospace" font-size="11">
+    <!-- gpu003 -->
+    <rect x="40" y="220" width="180" height="120" rx="6" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+    <text x="130" y="244" text-anchor="middle" font-family="sans-serif" font-size="13" font-weight="600">gpu003</text>
+    <rect x="60" y="258" width="140" height="22" rx="3" fill="#f0f3f6" stroke="#9ca3af"/>
+    <text x="130" y="273" text-anchor="middle">docker: svggt-&lt;jid&gt;</text>
+    <text x="130" y="298" text-anchor="middle">/workspace/.venv</text>
+    <text x="130" y="313" text-anchor="middle">accelerate launch</text>
+    <text x="130" y="328" text-anchor="middle">6× A100 PCIe</text>
+
+    <!-- gpu004 -->
+    <rect x="240" y="220" width="180" height="120" rx="6" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+    <text x="330" y="244" text-anchor="middle" font-family="sans-serif" font-size="13" font-weight="600">gpu004</text>
+    <rect x="260" y="258" width="140" height="22" rx="3" fill="#f0f3f6" stroke="#9ca3af"/>
+    <text x="330" y="273" text-anchor="middle">docker: svggt-&lt;jid&gt;</text>
+    <text x="330" y="298" text-anchor="middle">/workspace/.venv</text>
+    <text x="330" y="313" text-anchor="middle">accelerate launch</text>
+    <text x="330" y="328" text-anchor="middle">6× A100 PCIe</text>
+
+    <text x="475" y="290" font-family="sans-serif" font-size="13" font-weight="600">. . .</text>
+
+    <!-- gpuNNN -->
+    <rect x="500" y="220" width="180" height="120" rx="6" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+    <text x="590" y="244" text-anchor="middle" font-family="sans-serif" font-size="13" font-weight="600">gpuNNN</text>
+    <rect x="520" y="258" width="140" height="22" rx="3" fill="#f0f3f6" stroke="#9ca3af"/>
+    <text x="590" y="273" text-anchor="middle">docker: svggt-&lt;jid&gt;</text>
+    <text x="590" y="298" text-anchor="middle">/workspace/.venv</text>
+    <text x="590" y="313" text-anchor="middle">accelerate launch</text>
+    <text x="590" y="328" text-anchor="middle">6× A100 PCIe</text>
+  </g>
+
+  <!-- /jfs panel -->
+  <rect x="700" y="220" width="170" height="120" rx="6" fill="#fff4e5" stroke="#d97706" stroke-width="1.2"/>
+  <text x="785" y="244" text-anchor="middle" font-family="sans-serif" font-size="13" font-weight="600">/jfs (JuiceFS)</text>
+  <text x="785" y="265" text-anchor="middle" font-family="monospace" font-size="10.5">.venv/</text>
+  <text x="785" y="280" text-anchor="middle" font-family="monospace" font-size="10.5">data/train/...</text>
+  <text x="785" y="295" text-anchor="middle" font-family="monospace" font-size="10.5">checkpoints/&lt;exp&gt;/</text>
+  <text x="785" y="310" text-anchor="middle" font-family="monospace" font-size="10.5">workflows/jobs/&lt;id&gt;/</text>
+  <text x="785" y="325" text-anchor="middle" font-family="monospace" font-size="10.5">heartbeat</text>
+
+  <!-- SSH arrows head -> workers -->
+  <line x1="420" y1="120" x2="130" y2="220" stroke="#374151" stroke-width="1.2" marker-end="url(#ar)" stroke-dasharray="4 3"/>
+  <line x1="450" y1="120" x2="330" y2="220" stroke="#374151" stroke-width="1.2" marker-end="url(#ar)" stroke-dasharray="4 3"/>
+  <line x1="480" y1="120" x2="590" y2="220" stroke="#374151" stroke-width="1.2" marker-end="url(#ar)" stroke-dasharray="4 3"/>
+  <text x="220" y="180" font-family="sans-serif" font-size="11" fill="#374151" font-style="italic">SSH (bond0, control)</text>
+
+  <!-- NCCL arrows between workers -->
+  <path d="M 200 380 Q 270 410 280 380" fill="none" stroke="#0b6e4f" stroke-width="2" marker-end="url(#ar-blue)"/>
+  <path d="M 400 380 Q 470 410 480 380" fill="none" stroke="#0b6e4f" stroke-width="2" marker-end="url(#ar-blue)"/>
+  <line x1="130" y1="340" x2="130" y2="380" stroke="#0b6e4f" stroke-width="2"/>
+  <line x1="330" y1="340" x2="330" y2="380" stroke="#0b6e4f" stroke-width="2"/>
+  <line x1="590" y1="340" x2="590" y2="380" stroke="#0b6e4f" stroke-width="2"/>
+  <text x="360" y="420" font-family="sans-serif" font-size="12" fill="#0b6e4f" font-weight="600">NCCL all-reduce over mlx5_1 IB (100 Gbps)</text>
+
+  <!-- JFS arrows -->
+  <line x1="220" y1="280" x2="700" y2="280" stroke="#d97706" stroke-width="1" stroke-dasharray="2 2"/>
+  <line x1="420" y1="280" x2="700" y2="280" stroke="#d97706" stroke-width="1" stroke-dasharray="2 2"/>
+  <line x1="680" y1="280" x2="700" y2="280" stroke="#d97706" stroke-width="1" stroke-dasharray="2 2"/>
+  <text x="450" y="270" font-family="sans-serif" font-size="10" fill="#d97706" font-style="italic">/jfs via bond0</text>
+</svg>
+
+<table>
+  <tr><th>Traffic</th><th>Fabric</th><th>Why</th></tr>
+  <tr><td>NCCL all-reduce on gradients</td><td><code>mlx5_1</code> IB (HDR100, ~100 Gbps)</td><td>bandwidth-critical; RDMA</td></tr>
+  <tr><td>NCCL bootstrap / OOB control</td><td><code>bond0</code> (2×10 GbE = 20 Gbps)</td><td>small; doesn't need IB</td></tr>
+  <tr><td>/jfs reads (dataloader, .venv)</td><td><code>bond0</code> → JuiceFS metaserver</td><td>JuiceFS protocol over TCP</td></tr>
+  <tr><td>/jfs writes (checkpoints, TB, heartbeat)</td><td><code>bond0</code> → JuiceFS</td><td>low cadence (only rank 0)</td></tr>
+  <tr><td>SSH (orchestrator → nodes)</td><td><code>bond0</code></td><td>control plane</td></tr>
+  <tr><td>Docker logs stream</td><td><code>bond0</code></td><td>small; demuxed via asyncssh</td></tr>
+</table>
+
+<!-- ────────────────────────────────────────────── -->
+<h2 id="phase-a"><span class="phase-badge">A</span> Phase A — Bootstrap</h2>
+<p>
+  One-shot setup, runs on the head node. Idempotent and safe to re-run.
+  This is the <em>only</em> phase you typically have to repeat after a dependency change in
+  <code>pyproject.toml</code> or <code>uv.lock</code>.
+</p>
+
+<h3>Run</h3>
+<pre><span class="c-dim">$</span> cd /jfs/jing.feng/codebases/StreamVGGT
+<span class="c-dim">$</span> ./scripts/bootstrap_venv.sh</pre>
+
+<h3>What it does</h3>
+<ol>
+  <li>Checks <code>uv</code> is on <code>$PATH</code> (exit 1 with install URL if missing).</li>
+  <li>Verifies <code>/jfs</code> has ≥ 5 GB free (exit 2 if not — JuiceFS is shared, full disk hits everyone).</li>
+  <li>Takes <code>flock -n .venv.lock</code> so a peer node can't race the same sync (exit 3 if held).</li>
+  <li>Runs <code>uv sync --extra orchestrator --group dev</code>.</li>
+  <li>Sanity-checks: <code>python -c "import torch, accelerate, asyncssh, click, yaml, rich"</code>.</li>
+</ol>
+
+<h3>Expected output</h3>
+<pre class="sample-output">[bootstrap] Repo root: /jfs/jing.feng/codebases/StreamVGGT
+[bootstrap] Venv path: /jfs/jing.feng/codebases/StreamVGGT/.venv
+[bootstrap] uv version: uv 0.4.x
+<span class="c-dim">Resolved 312 packages in 4.21s
+Built 5 wheels
+Installed 312 packages in 18s</span>
+venv OK
+[bootstrap] Done. Activate with:  source /jfs/jing.feng/codebases/StreamVGGT/.venv/bin/activate</pre>
+
+<div class="callout warn">
+  <strong>JuiceFS first-run latency</strong>
+  Sync time is dominated by JuiceFS write throughput; the first bootstrap typically takes
+  60–120 s longer than re-runs. The page cache warms after the first run, so subsequent
+  imports inside containers are much faster.
+</div>
+
+<!-- ────────────────────────────────────────────── -->
+<h2 id="phase-b"><span class="phase-badge b">B</span> Phase B — Discover</h2>
+<p>
+  Probe every candidate host in <code>workflows/cluster.yaml#candidate_hosts</code> over
+  asyncssh, capture per-GPU memory usage from <code>nvidia-smi</code>, and write the
+  manifest of "currently idle" GPUs to <code>workflows/nodes.json</code>.
+  Unreachable hosts are skipped without aborting.
+</p>
+
+<h3>Cluster config</h3>
+<details>
+<summary>workflows/cluster.yaml (template — edit for your fleet)</summary>
+<pre>ssh:
+  user: jing.feng
+  identity_file: ~/.ssh/id_ed25519
+  connect_timeout_s: 5
+
+candidate_hosts:
+  - gpu003
+  - gpu004
+  - gpu005
+  - gpu006
+  - gpu007
+  - gpu008
+
+docker:
+  image: babiking/ubuntu:12.8.1-cudnn-devel-ubuntu24.04
+  shm_size: 16G
+
+paths:
+  repo: /jfs/jing.feng/codebases/StreamVGGT
+  venv: /jfs/jing.feng/codebases/StreamVGGT/.venv
+  jfs: /jfs
+
+discovery:
+  idle_threshold_mib: 500       # GPU counts as idle if memory.used &lt; this
+  min_idle_gpus_per_node: 1     # skip nodes with fewer idle GPUs
+
+nccl:
+  ib_hca: mlx5_1                # mlx5_0 is currently DOWN
+  socket_ifname: bond0
+  ib_disable: 0
+  async_error_handling: 1
+  debug: WARN                   # INFO during bring-up, then WARN
+  ib_timeout: 23
+  net_gdr_level: PIX
+
+train:
+  entrypoint: src/train.py
+  config_name: train
+  main_port: 26902
+</pre>
+</details>
+
+<h3>Run</h3>
+<pre><span class="c-dim">$</span> ./scripts/svggt-orch discover --dry-run    <span class="c-dim"># prints plan, no SSH</span>
+<span class="c-dim">$</span> ./scripts/svggt-orch discover              <span class="c-dim"># real fan-out</span></pre>
+
+<h3>What it does (per host, in parallel)</h3>
+<ol>
+  <li>Open asyncssh connection (<code>connect_timeout_s</code> from <code>cluster.yaml</code>).</li>
+  <li>Run <code>nvidia-smi --query-gpu=index,memory.used --format=csv,noheader,nounits</code>.</li>
+  <li>Filter GPUs with <code>memory.used &lt; idle_threshold_mib</code> (default 500 MiB).</li>
+  <li>Skip the host if it has fewer than <code>min_idle_gpus_per_node</code> idle GPUs (default 1).</li>
+  <li>Pull the IPoIB address via <code>ip -j addr show ibs110</code> for later NCCL bootstrap.</li>
+</ol>
+
+<h3>Expected output</h3>
+<pre class="sample-output">discover: wrote workflows/nodes.json — 6 nodes, 36 idle GPUs</pre>
+
+<h3>workflows/nodes.json (sample)</h3>
+<pre>[
+  {
+    "host": "gpu003",
+    "bond_ip": "172.31.208.5",
+    "ib_ip": "10.10.100.5",
+    "free_gpus": [0, 1, 2, 3, 4, 5],
+    "detected_at": "2026-05-25T16:23:14Z"
+  },
+  {
+    "host": "gpu004",
+    "bond_ip": "172.31.208.6",
+    "ib_ip": "10.10.100.6",
+    "free_gpus": [0, 1, 2, 3, 4, 5],
+    "detected_at": "2026-05-25T16:23:14Z"
+  }
+  /* ... up to 6 nodes ... */
+]</pre>
+
+<div class="callout">
+  <strong>Idempotent and re-runnable</strong>
+  <code>discover</code> overwrites <code>workflows/nodes.json</code> on every run.
+  If a peer steals GPUs between discover and launch, the launcher will use whatever
+  was current at <code>discover</code> time — re-run discover before launch if you suspect drift.
+</div>
+
+<!-- ────────────────────────────────────────────── -->
+<h2 id="phase-c"><span class="phase-badge c">C</span> Phase C — Launch</h2>
+<p>
+  Compute a <code>LaunchPlan</code> from <code>nodes.json</code> + <code>cluster.yaml</code>, write the
+  job manifest, then asyncssh-fan-out a <code>docker run -d</code> to every node. Atomic
+  abort on any failure.
+</p>
+
+<h3>Run</h3>
+<pre><span class="c-dim">$</span> ./scripts/svggt-orch launch --dry-run --exp-name StreamVGGT_alpha0.1_lr1e-5_nog
+<span class="c-dim">$</span> ./scripts/svggt-orch launch --exp-name StreamVGGT_alpha0.1_lr1e-5_nog</pre>
+
+<h3>How world size is computed</h3>
+<table>
+  <tr><th>Quantity</th><th>Computed as</th><th>Example (6 hosts × 6 GPUs)</th></tr>
+  <tr><td><code>NUM_MACHINES</code></td><td>len(nodes)</td><td>6</td></tr>
+  <tr><td><code>NUM_PROCESSES</code> (world size)</td><td>sum(len(node.free_gpus))</td><td>36</td></tr>
+  <tr><td><code>NPROC_PER_NODE</code></td><td>len(node.free_gpus) per node</td><td>6 each</td></tr>
+  <tr><td><code>MACHINE_RANK</code></td><td>index in nodes.json (0..N-1)</td><td>0..5</td></tr>
+  <tr><td><code>MAIN_PROCESS_IP</code></td><td>nodes[0].ib_ip <em>(falls back to bond_ip)</em></td><td>10.10.100.5</td></tr>
+  <tr><td><code>MAIN_PROCESS_PORT</code></td><td><code>train.main_port</code> from cluster.yaml</td><td>26902</td></tr>
+  <tr><td><code>CUDA_VISIBLE_DEVICES</code></td><td>comma-joined free_gpus per node</td><td><code>0,1,2,3,4,5</code></td></tr>
+</table>
+
+<h3>Per-node docker run (what the orchestrator executes via ssh)</h3>
+<pre>cd /jfs/jing.feng/codebases/StreamVGGT \
+  &amp;&amp; source scripts/lib/docker_env.sh \
+  &amp;&amp; docker run -d --name svggt-&lt;jobid&gt; \
+       --gpus "device=0,1,2,3,4,5" \
+       --env JOB_ID=&lt;jobid&gt; \
+       --env EXP_NAME=StreamVGGT_alpha0.1_lr1e-5_nog \
+       --env NUM_MACHINES=6  --env MACHINE_RANK=&lt;0..5&gt; \
+       --env NUM_PROCESSES=36 --env NPROC_PER_NODE=6 \
+       --env MAIN_PROCESS_IP=10.10.100.5 --env MAIN_PROCESS_PORT=26902 \
+       --env CONFIG_NAME=train --env CUDA_VISIBLE_DEVICES=0,1,2,3,4,5 \
+       --env NCCL_IB_HCA=mlx5_1 --env NCCL_IB_DISABLE=0 \
+       --env NCCL_SOCKET_IFNAME=bond0 --env NCCL_ASYNC_ERROR_HANDLING=1 \
+       --env NCCL_DEBUG=WARN --env NCCL_IB_TIMEOUT=23 \
+       --env NCCL_NET_GDR_LEVEL=PIX \
+       "${DOCKER_RUN_FLAGS[@]}" \
+       babiking/ubuntu:12.8.1-cudnn-devel-ubuntu24.04 \
+       /workspace/scripts/worker_entry.sh</pre>
+
+<h3>Inside the container — <code>worker_entry.sh</code></h3>
+<ol>
+  <li>Validate required env vars (exit 1 if any missing).</li>
+  <li><code>mountpoint -q /jfs</code> + touch test (exit 11 if /jfs not writable as host UID).</li>
+  <li>Activate <code>/workspace/.venv</code> via <code>VIRTUAL_ENV</code> + <code>PATH</code> (exit 12 if missing).</li>
+  <li>Start background <code>nvidia-smi dmon -s pucvmet -d 2 -o T</code> → <code>workflows/jobs/&lt;jobid&gt;/dmon-&lt;host&gt;.csv</code>.</li>
+  <li><code>cd /workspace/src</code>; <code>exec accelerate launch --multi_gpu --num_machines $N --machine_rank $R ... ./train.py --config-name $CONFIG_NAME</code>.</li>
+</ol>
+
+<h3>Expected output (head)</h3>
+<pre class="sample-output">launch: starting svggt-20260525-162300 on 6 nodes
+launch: started ok. Manifest: workflows/jobs/20260525-162300/manifest.json</pre>
+
+<div class="callout warn">
+  <strong>Atomic abort</strong>
+  If any of the 6 <code>docker run</code> calls returns non-zero (image-pull failure,
+  port conflict, /jfs not mounted, etc.), the orchestrator immediately fans out
+  <code>docker rm -f svggt-&lt;jobid&gt;</code> to <em>every</em> node and exits with code 3.
+  No partial launches survive.
+</div>
+
+<h3>workflows/jobs/&lt;jobid&gt;/manifest.json (sample)</h3>
+<pre>{
+  "job_id": "20260525-162300",
+  "exp_name": "StreamVGGT_alpha0.1_lr1e-5_nog",
+  "nodes": [ /* NodeInfo[] copied from nodes.json */ ],
+  "master_host": "gpu003",
+  "master_ip": "10.10.100.5",
+  "main_port": 26902,
+  "world_size": 36,
+  "container_name": "svggt-20260525-162300",
+  "started_at": "2026-05-25T16:23:00Z",
+  "status": "running",
+  "exit_codes": {}
+}</pre>
+
+<!-- ────────────────────────────────────────────── -->
+<h2 id="phase-d"><span class="phase-badge d">D</span> Phase D — Training (steady state)</h2>
+<p>
+  Once <code>accelerate launch</code> spawns the per-GPU processes inside each container,
+  the training loop is the same code that runs in the single-node case
+  (<code>src/train.py</code>, <code>train_one_epoch</code>).
+  The only difference: world size 36 instead of 1, and one extra line that writes a
+  heartbeat file.
+</p>
+
+<svg class="diagram" viewBox="0 0 880 220" width="100%" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="per-step training loop">
+  <defs>
+    <marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#374151"/>
+    </marker>
+  </defs>
+  <g font-family="monospace" font-size="11">
+    <rect x="20"  y="40" width="120" height="60" rx="4" fill="#fff" stroke="#374151"/><text x="80"  y="65" text-anchor="middle">1. dataloader</text><text x="80"  y="80" text-anchor="middle" font-size="10">read shards</text><text x="80"  y="93" text-anchor="middle" font-size="10" fill="#d97706">[/jfs · bond0]</text>
+    <rect x="160" y="40" width="120" height="60" rx="4" fill="#fff" stroke="#374151"/><text x="220" y="65" text-anchor="middle">2. teacher fwd</text><text x="220" y="80" text-anchor="middle" font-size="10">VGGT frozen</text>
+    <rect x="300" y="40" width="120" height="60" rx="4" fill="#fff" stroke="#374151"/><text x="360" y="65" text-anchor="middle">3. student fwd</text><text x="360" y="80" text-anchor="middle" font-size="10">+ DistillLoss</text>
+    <rect x="440" y="40" width="120" height="60" rx="4" fill="#fff" stroke="#374151"/><text x="500" y="65" text-anchor="middle">4. backward</text><text x="500" y="80" text-anchor="middle" font-size="10">grad accum</text>
+    <rect x="580" y="40" width="120" height="60" rx="4" fill="#e7f5ee" stroke="#0b6e4f"/><text x="640" y="65" text-anchor="middle">5. NCCL allreduce</text><text x="640" y="80" text-anchor="middle" font-size="10" fill="#0b6e4f">[mlx5_1 IB]</text>
+    <rect x="720" y="40" width="120" height="60" rx="4" fill="#fff" stroke="#374151"/><text x="780" y="65" text-anchor="middle">6. optim.step()</text>
+
+    <line x1="140" y1="70" x2="160" y2="70" stroke="#374151" marker-end="url(#ar2)"/>
+    <line x1="280" y1="70" x2="300" y2="70" stroke="#374151" marker-end="url(#ar2)"/>
+    <line x1="420" y1="70" x2="440" y2="70" stroke="#374151" marker-end="url(#ar2)"/>
+    <line x1="560" y1="70" x2="580" y2="70" stroke="#374151" marker-end="url(#ar2)"/>
+    <line x1="700" y1="70" x2="720" y2="70" stroke="#374151" marker-end="url(#ar2)"/>
+
+    <!-- rank 0 extras -->
+    <rect x="160" y="130" width="200" height="60" rx="4" fill="#fff4e5" stroke="#d97706" stroke-dasharray="3 2"/><text x="260" y="150" text-anchor="middle" font-family="sans-serif" font-weight="600">rank 0 only, every print_freq</text>
+    <text x="260" y="167" text-anchor="middle" font-size="10">tb.add_scalar(loss, lr, ...)</text>
+    <text x="260" y="180" text-anchor="middle" font-size="10">write heartbeat file</text>
+    <line x1="260" y1="100" x2="260" y2="130" stroke="#d97706" stroke-width="1.2" stroke-dasharray="2 2"/>
+
+    <rect x="500" y="130" width="200" height="60" rx="4" fill="#fff4e5" stroke="#d97706" stroke-dasharray="3 2"/><text x="600" y="150" text-anchor="middle" font-family="sans-serif" font-weight="600">rank 0, every save_freq epoch</text>
+    <text x="600" y="167" text-anchor="middle" font-size="10">torch.save(checkpoint-last.pth)</text>
+    <text x="600" y="180" text-anchor="middle" font-size="10" fill="#d97706">[/jfs · bond0]</text>
+    <line x1="600" y1="100" x2="600" y2="130" stroke="#d97706" stroke-width="1.2" stroke-dasharray="2 2"/>
+  </g>
+</svg>
+
+<h3>Heartbeat write (added in this branch — train.py)</h3>
+<pre>                for name, val in loss_details.items():
+                    ...
+                    log_writer.add_scalar("train_" + name, val, step)
+
+                # Heartbeat for the orchestrator's hang watchdog.
+                Path(args.output_dir, "heartbeat").write_text(
+                    f"{time.time()} {step}\n"
+                )</pre>
+
+<p>
+  Cadence: written every <code>print_freq</code> steps (10 by default) on rank 0 only.
+  The orchestrator's <code>monitor</code> polls <code>mtime(&lt;exp&gt;/heartbeat)</code> and
+  flips to a red banner if it goes stale for &gt; 600 s. This catches the
+  "rank silently hung; NCCL won't timeout for 100 minutes" failure mode.
+</p>
+
+<!-- ────────────────────────────────────────────── -->
+<h2 id="phase-e"><span class="phase-badge e">E</span> Phase E — Monitoring (3 layers)</h2>
+
+<h3>Layer 1 — Per-rank log demux (<code>tail</code>)</h3>
+<pre><span class="c-dim">$</span> ./scripts/svggt-orch tail --job 20260525-162300</pre>
+<p>
+  Streams <code>docker logs -f</code> from every node concurrently and demuxes onto
+  stdout with a per-rank colored prefix. Lines also land in
+  <code>workflows/jobs/&lt;jobid&gt;/rank-NN.log</code> for later inspection.
+</p>
+<pre class="sample-output"><span class="c-b">[r=00 h=gpu003]</span> Epoch: [0]  [   5/4500]  eta: 0:34:21  lr: 0.00000820  loss: 0.8421  time: 0.4584
+<span class="c-m">[r=01 h=gpu003]</span> Epoch: [0]  [   5/4500]  eta: 0:34:18  lr: 0.00000820  loss: 0.8389  time: 0.4571
+<span class="c-y">[r=02 h=gpu004]</span> Epoch: [0]  [   5/4500]  eta: 0:34:25  lr: 0.00000820  loss: 0.8455  time: 0.4602
+<span class="c-r">[r=03 h=gpu004]</span> Epoch: [0]  [   5/4500]  eta: 0:34:18  lr: 0.00000820  loss: 0.8398  time: 0.4577</pre>
+
+<div class="callout">
+  <strong>Straggler detection by eye</strong>
+  Spot a rank whose <code>time:</code> per step is significantly higher than peers — that's
+  your straggler. Most common causes: slower IB pipe on one node, JuiceFS thrashing,
+  thermal throttling. Cross-check with the <code>monitor</code> TUI.
+</div>
+
+<h3>Layer 2 — Live TUI dashboard (<code>monitor</code>)</h3>
+<pre><span class="c-dim">$</span> ./scripts/svggt-orch monitor --job 20260525-162300</pre>
+<p>
+  Polls each node's <code>dmon-&lt;host&gt;.csv</code> and IB byte counters every 2 s.
+  The dmon parser is header-driven (it reads the
+  <code>#Time gpu pwr gtemp mtemp sm ...</code> line and indexes by column name),
+  so a future <code>nvidia-smi</code> reordering columns can't silently mislabel data.
+</p>
+<pre class="sample-output">                 job=20260525-162300  exp=StreamVGGT_alpha0.1_lr1e-5_nog  elapsed=02:14  ws=36
+┏━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━┓
+┃ host     ┃        gpu utils % ┃                  gpu mem MiB  ┃             temp C ┃   IB tx/rx GB/s ┃         status  ┃
+┡━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━┩
+│ gpu003   │     97 96 97 95 96 97  │  71234 71250 71198 71240 71210 71225  │   68 69 70 70 71 70  │       8.2 / 7.9  │              ok │
+│ gpu004   │     32 94 95 96 95 96  │  71178 71240 71190 71220 71202 71215  │   55 67 68 68 69 67  │       1.1 / 0.9  │ <span class="c-red">straggler suspected</span> │
+│ gpu005   │     97 96 96 97 95 97  │  71240 71202 71215 71187 71244 71210  │   71 70 71 69 70 71  │       8.1 / 8.0  │              ok │
+│ gpu006   │     96 97 97 96 96 97  │  71225 71210 71187 71244 71202 71215  │   70 71 70 70 71 70  │       8.0 / 7.8  │              ok │
+└──────────┴────────────────────┴───────────────────────────────┴────────────────────┴────────────────┴─────────────────┘</pre>
+
+<h3>Layer 3 — TensorBoard (<code>tb</code>)</h3>
+<pre><span class="c-dim">$</span> ./scripts/svggt-orch tb --job 20260525-162300</pre>
+<pre class="sample-output">tb: spawning tensorboard --logdir /jfs/.../checkpoints/StreamVGGT_alpha0.1_lr1e-5_nog/logs --port 6006
+tb: on your laptop, run:
+    ssh -L 6006:localhost:6006 jing.feng@gpu003
+    then open http://localhost:6006</pre>
+
+<h3>Heartbeat watchdog (background; surfaces in monitor)</h3>
+<p>
+  <code>svggt_orch.heartbeat.is_stale</code> compares <code>mtime</code> of
+  <code>checkpoints/&lt;exp_name&gt;/heartbeat</code> against a 600 s threshold.
+  When stale, the <code>monitor</code> TUI title flips red and per-row status shows
+  <code>STALE HEARTBEAT</code>. <strong>Notify only</strong> — no auto-kill;
+  you decide whether to <code>kill</code>.
+</p>
+
+<!-- ────────────────────────────────────────────── -->
+<h2 id="phase-f"><span class="phase-badge f">F</span> Phase F — Cleanup</h2>
+
+<h3>Voluntary shutdown</h3>
+<pre><span class="c-dim">$</span> ./scripts/svggt-orch kill --job 20260525-162300 --yes</pre>
+<p>Fans out <code>docker rm -f svggt-&lt;jobid&gt;</code> to every node, then flips
+   <code>manifest.json#status</code> to <code>"killed"</code>.</p>
+
+<h3>Status snapshot</h3>
+<pre><span class="c-dim">$</span> ./scripts/svggt-orch status --job 20260525-162300</pre>
+<pre class="sample-output">job_id     : 20260525-162300
+exp_name   : StreamVGGT_alpha0.1_lr1e-5_nog
+started_at : 2026-05-25T16:23:00Z
+container  : svggt-20260525-162300
+world_size : 36
+status     : running
+per-host:
+  gpu003               running 0
+  gpu004               running 0
+  gpu005               running 0
+  gpu006               running 0
+  gpu007               running 0
+  gpu008               running 0</pre>
+
+<h3>Restart (auto-resume from checkpoint)</h3>
+<p>
+  <code>train.py</code> already auto-resumes from <code>checkpoint-last.pth</code> if it exists
+  (<code>train.py:137-138</code>). So the "kill → re-launch" recovery cycle is:
+</p>
+<pre><span class="c-dim">$</span> ./scripts/svggt-orch kill    --job &lt;old_jid&gt; --yes
+<span class="c-dim">$</span> ./scripts/svggt-orch discover                           <span class="c-dim"># refresh idle GPUs</span>
+<span class="c-dim">$</span> ./scripts/svggt-orch launch  --exp-name StreamVGGT_alpha0.1_lr1e-5_nog
+<span class="c-dim"># train.py logs:  "Resuming from checkpoint-last.pth"</span></pre>
+
+<!-- ────────────────────────────────────────────── -->
+<h2 id="errors">10. Error handling &amp; recovery</h2>
+<p>The orchestrator distinguishes <em>infrastructure failures</em> (SSH, docker, /jfs) from
+   <em>learning failures</em> (OOM, NaN loss, dataloader exceptions). The container exit code
+   is the only signal the orchestrator sees per rank.</p>
+
+<table>
+  <tr><th>Phase</th><th>Failure</th><th>Orchestrator response</th><th>You do</th></tr>
+  <tr><td>Bootstrap</td><td><code>uv</code> missing</td><td>exit 1, prints install URL</td><td>install uv, rerun</td></tr>
+  <tr><td>Bootstrap</td><td>/jfs &lt; 5 GB free</td><td>exit 2</td><td>clean up /jfs, rerun</td></tr>
+  <tr><td>Bootstrap</td><td>flock contention</td><td>exit 3</td><td>wait for peer, or investigate stale lock</td></tr>
+  <tr><td>Discover</td><td>host unreachable</td><td>skip host, continue</td><td>nothing — pool members are best-effort</td></tr>
+  <tr><td>Discover</td><td>no idle GPUs anywhere</td><td>exit 2, no nodes.json written</td><td>wait or shrink other workloads</td></tr>
+  <tr><td>Launch</td><td>docker pull fails on one node</td><td><strong>abort all</strong> via docker rm, exit 3</td><td>pre-pull, rerun</td></tr>
+  <tr><td>Launch</td><td>/jfs not mounted on a node</td><td>worker_entry exit 11, atomic abort</td><td>mount /jfs on the bad node</td></tr>
+  <tr><td>Launch</td><td>port 26902 in use</td><td>accelerate errors; abort all</td><td>edit <code>train.main_port</code> in cluster.yaml</td></tr>
+  <tr><td>Training</td><td>CUDA OOM on any rank</td><td>NCCL_ASYNC_ERROR_HANDLING propagates abort; all ranks exit</td><td>reduce batch_size; rerun (auto-resume)</td></tr>
+  <tr><td>Training</td><td>NaN loss</td><td>rank raises; cluster aborts</td><td>lower lr; rerun <em>without</em> resume (or it'll re-NaN)</td></tr>
+  <tr><td>Training</td><td>Node hardware fail mid-run</td><td>rank silent → NCCL timeout (100 min)</td><td>monitor's heartbeat banner fires at 10 min; you kill</td></tr>
+  <tr><td>Training</td><td>JuiceFS transient stall</td><td>dataloader stalls; heartbeat goes stale</td><td>wait (often recovers) or kill</td></tr>
+  <tr><td>Cleanup</td><td>Zombie container from prior crash</td><td>launch refuses; offers <code>--force-clean</code></td><td>confirm</td></tr>
+</table>
+
+<div class="callout danger">
+  <strong>NCCL_ASYNC_ERROR_HANDLING=1 is doing real work</strong>
+  Without it, a dying rank leaves peers blocked on the next all-reduce until the
+  6000 s (100 min) timeout fires. With it, peers see the missing rank within seconds
+  and abort cleanly. This env var is set by default by the orchestrator's
+  <code>nccl_env.build_nccl_env</code>; do not disable it without understanding the
+  silent-hang implications.
+</div>
+
+<!-- ────────────────────────────────────────────── -->
+<h2 id="reference">11. CLI quick reference</h2>
+<table>
+  <tr><th>Command</th><th>What it does</th><th>Exit codes</th></tr>
+  <tr>
+    <td><code>./scripts/bootstrap_venv.sh</code></td>
+    <td>Populate <code>.venv</code> via <code>uv sync --extra orchestrator --group dev</code></td>
+    <td>0 ok / 1 config / 2 ENOSPC / 3 flock</td>
+  </tr>
+  <tr>
+    <td><code>svggt-orch discover [--dry-run]</code></td>
+    <td>SSH-fan-out GPU scan → <code>workflows/nodes.json</code></td>
+    <td>0 ok / 2 no nodes</td>
+  </tr>
+  <tr>
+    <td><code>svggt-orch launch [--dry-run] [--exp-name X]</code></td>
+    <td>Fan-out <code>docker run</code>; atomic abort on partial failure</td>
+    <td>0 ok / 2 no nodes.json / 3 launch failed</td>
+  </tr>
+  <tr>
+    <td><code>svggt-orch tail --job &lt;id&gt;</code></td>
+    <td>Stream per-rank logs with color demux</td>
+    <td>0 ok / 1 no manifest</td>
+  </tr>
+  <tr>
+    <td><code>svggt-orch monitor --job &lt;id&gt;</code></td>
+    <td>Live TUI: GPU util/mem/temp + IB GB/s + heartbeat banner</td>
+    <td>0 ok / 1 no manifest</td>
+  </tr>
+  <tr>
+    <td><code>svggt-orch tb --job &lt;id&gt;</code></td>
+    <td>Spawn TensorBoard against <code>checkpoints/&lt;exp&gt;/logs</code></td>
+    <td>0 ok / 1 missing manifest or tensorboard</td>
+  </tr>
+  <tr>
+    <td><code>svggt-orch status --job &lt;id&gt;</code></td>
+    <td>One-shot manifest + per-host docker state</td>
+    <td>0 ok / 1 no manifest</td>
+  </tr>
+  <tr>
+    <td><code>svggt-orch kill --job &lt;id&gt; --yes</code></td>
+    <td>Fan-out <code>docker rm -f</code>; flip manifest status to "killed"</td>
+    <td>0 ok / 1 no manifest</td>
+  </tr>
+</table>
+
+<!-- ────────────────────────────────────────────── -->
+<h2 id="smoke">12. L4 smoke checklist</h2>
+<p>Before declaring a multi-node bring-up complete, run these on the real cluster.
+   Each item is one terminal command + the expected observation.</p>
+
+<table>
+  <tr><th>Step</th><th>Expectation</th></tr>
+  <tr><td><code>./scripts/svggt-orch discover</code></td><td>Both/all nodes reported; idle GPU count matches manual <code>nvidia-smi</code>.</td></tr>
+  <tr><td><code>./scripts/svggt-orch launch --exp-name StreamVGGT_smoke</code></td><td>Exit 0; <code>workflows/jobs/&lt;id&gt;/manifest.json</code> exists; world size matches expectation.</td></tr>
+  <tr><td><code>./scripts/svggt-orch tail --job &lt;id&gt;</code></td><td>Interleaved logs from all ranks; per-step <code>loss</code> printing within 1–2 min of launch.</td></tr>
+  <tr><td><code>./scripts/svggt-orch monitor --job &lt;id&gt;</code></td><td>GPU util &gt; 0 within ~1 min; IB tx/rx columns &gt; 0 GB/s once training starts.</td></tr>
+  <tr><td>Wait one <code>save_freq</code> epoch</td><td><code>checkpoints/StreamVGGT_smoke/checkpoint-last.pth</code> exists and <code>torch.load</code>s.</td></tr>
+  <tr><td><code>./scripts/svggt-orch kill --job &lt;id&gt; --yes</code></td><td>Containers gone within 5 s on every node; manifest <code>status: "killed"</code>.</td></tr>
+  <tr><td>Re-run <code>launch</code></td><td>train.py logs "Resuming from checkpoint-last.pth".</td></tr>
+  <tr><td>Crash injection: <code>docker kill svggt-&lt;id&gt;</code> on one node</td><td>Surviving ranks exit within 30 s (<strong>not</strong> 100 min) — proves <code>NCCL_ASYNC_ERROR_HANDLING=1</code>.</td></tr>
+  <tr><td>Heartbeat: <code>touch -d '-20 min' &lt;exp&gt;/heartbeat</code></td><td><code>monitor</code> TUI banner flips red and per-row status reads <code>STALE HEARTBEAT</code>.</td></tr>
+  <tr><td>Post-cleanup: <code>./scripts/svggt-orch discover</code></td><td>All GPUs idle again across all hosts.</td></tr>
+</table>
+
+<footer>
+  StreamVGGT multi-node distillation walkthrough · branch
+  <code>feature/multinode-orchestrator</code>
+  · designed against <code>workflows/cluster.yaml</code> with 6 × A100 PCIe / node, IB HDR100 on <code>mlx5_1</code>.
+</footer>
+</div>
+</body>
+</html>
