@@ -1,0 +1,1999 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1.0" />
+<title>StreamVGGT · Training Data Atlas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,800&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --paper: #efe8d6;
+    --paper-2: #f6f0e0;
+    --paper-3: #fbf6e8;
+    --ink: #1a1f2e;
+    --ink-soft: #3a3f4b;
+    --rule: #2a2f3e;
+    --accent: #b94a23;       /* oxide red */
+    --accent-2: #1e4a52;     /* deep teal */
+    --amber: #9f7a1e;
+    --olive: #5b6730;
+    --muted: #80796a;
+    --muted-2: #a39c8a;
+    --plum: #6b3e57;
+
+    /* typology */
+    --t-indoor:   #1e4a52;
+    --t-outdoor:  #9f7a1e;
+    --t-mixed:    #6b3e57;
+    --t-object:   #5b6730;
+    --t-real:     #b94a23;
+    --t-synth:    #2a4f5f;
+    --t-static:   #80796a;
+    --t-dynamic:  #b94a23;
+
+    /* tasks */
+    --task-mono:    #1e4a52;
+    --task-video:   #2a4f5f;
+    --task-recon:   #5b6730;
+    --task-pose:    #9f7a1e;
+    --task-ad-hoc:  #6b3e57;
+
+    --grid-line: rgba(26,31,46,0.07);
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'Newsreader', Georgia, serif;
+    font-size: 16px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* paper texture with grain */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background-image:
+      radial-gradient(circle at 25% 30%, rgba(120, 100, 60, 0.045) 0px, transparent 1px),
+      radial-gradient(circle at 75% 65%, rgba(80, 60, 30, 0.04) 0px, transparent 1px),
+      radial-gradient(circle at 40% 80%, rgba(150, 120, 80, 0.03) 0px, transparent 1px);
+    background-size: 3px 3px, 5px 5px, 7px 7px;
+    z-index: 100;
+    mix-blend-mode: multiply;
+  }
+  /* faint grid overlay */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background-image:
+      linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
+    background-size: 96px 96px;
+    z-index: 99;
+  }
+
+  .container { max-width: 1480px; margin: 0 auto; padding: 64px 56px 96px; position: relative; z-index: 1; }
+
+  /* ─── Masthead ───────────────────────────── */
+  .masthead {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: end;
+    border-bottom: 1.5px solid var(--rule);
+    padding-bottom: 28px;
+    margin-bottom: 8px;
+  }
+  .mast-left .eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .mast-left .eyebrow .sigil {
+    display: inline-block;
+    width: 18px;
+    height: 18px;
+    border: 1.5px solid var(--accent);
+    border-radius: 50%;
+    position: relative;
+  }
+  .mast-left .eyebrow .sigil::after {
+    content: '';
+    position: absolute;
+    inset: 4px;
+    background: var(--accent);
+    border-radius: 50%;
+  }
+  .mast-left h1 {
+    font-family: 'Fraunces', serif;
+    font-variation-settings: "opsz" 144, "wght" 800;
+    font-size: clamp(56px, 8.2vw, 132px);
+    line-height: 0.86;
+    letter-spacing: -0.04em;
+    margin: 18px 0 0 0;
+    color: var(--ink);
+  }
+  .mast-left h1 em {
+    font-style: italic;
+    color: var(--accent);
+    font-variation-settings: "opsz" 144, "wght" 500;
+  }
+  .mast-left .subtitle {
+    margin-top: 22px;
+    font-family: 'Newsreader', serif;
+    font-style: italic;
+    font-size: 21px;
+    color: var(--ink-soft);
+    max-width: 640px;
+    line-height: 1.4;
+  }
+
+  .mast-right {
+    text-align: right;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+    line-height: 1.9;
+    color: var(--muted);
+    text-transform: uppercase;
+    border-left: 1px solid var(--rule);
+    padding-left: 24px;
+  }
+  .mast-right dt { color: var(--ink); font-weight: 500; }
+  .mast-right dd { margin: 0 0 6px 0; }
+
+  /* ─── Stat strip ─────────────────────────── */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 0;
+    border-bottom: 1.5px solid var(--rule);
+    margin-bottom: 56px;
+  }
+  .stat {
+    padding: 28px 24px 24px 0;
+    border-right: 1px solid var(--rule);
+    position: relative;
+  }
+  .stat:last-child { border-right: none; }
+  .stat .idx {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: var(--muted);
+  }
+  .stat .num {
+    font-family: 'Fraunces', serif;
+    font-variation-settings: "opsz" 144, "wght" 500;
+    font-size: 54px;
+    line-height: 1;
+    margin: 8px 0 6px;
+    color: var(--ink);
+    letter-spacing: -0.03em;
+  }
+  .stat .num sup {
+    font-size: 16px;
+    font-variation-settings: "opsz" 36, "wght" 400;
+    color: var(--accent);
+    vertical-align: super;
+    margin-left: 4px;
+  }
+  .stat .label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+  }
+
+  /* ─── Section heading ────────────────────── */
+  .sec-head {
+    display: grid;
+    grid-template-columns: 80px 1fr auto;
+    align-items: baseline;
+    gap: 24px;
+    border-bottom: 1px solid var(--rule);
+    padding-bottom: 12px;
+    margin: 64px 0 28px;
+  }
+  .sec-head .sec-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    color: var(--accent);
+    font-weight: 600;
+  }
+  .sec-head h2 {
+    font-family: 'Fraunces', serif;
+    font-variation-settings: "opsz" 72, "wght" 500;
+    font-size: 34px;
+    margin: 0;
+    letter-spacing: -0.02em;
+  }
+  .sec-head h2 em { font-style: italic; color: var(--accent); font-weight: 400; }
+  .sec-head .meta {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  /* ─── Mixture composition bar ────────────── */
+  .mix {
+    margin-bottom: 8px;
+  }
+  .mix-bar {
+    display: flex;
+    height: 56px;
+    border: 1px solid var(--rule);
+    background: var(--paper-3);
+    overflow: hidden;
+    position: relative;
+  }
+  .mix-cell {
+    position: relative;
+    border-right: 1px solid var(--paper);
+    transition: transform 0.25s cubic-bezier(0.2, 0.6, 0.2, 1), filter 0.25s;
+    cursor: default;
+  }
+  .mix-cell:last-child { border-right: none; }
+  .mix-cell::after {
+    content: attr(data-label);
+    position: absolute;
+    bottom: -28px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--ink);
+    background: var(--paper-3);
+    padding: 4px 8px;
+    border: 1px solid var(--rule);
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity 0.2s, transform 0.2s;
+    pointer-events: none;
+    z-index: 5;
+  }
+  .mix-cell:hover {
+    filter: brightness(1.18) saturate(1.1);
+    transform: scaleY(1.06);
+  }
+  .mix-cell:hover::after {
+    opacity: 1;
+    transform: translateX(-50%) translateY(-2px);
+  }
+  .mix-axis {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+
+  /* ─── Legend ─────────────────────────────── */
+  .legend {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 0;
+    border: 1px solid var(--rule);
+    background: var(--paper-3);
+    margin-bottom: 56px;
+    margin-top: 28px;
+  }
+  .legend > div {
+    padding: 18px 20px;
+    border-right: 1px solid var(--rule);
+  }
+  .legend > div:last-child { border-right: none; }
+  .legend-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+  .legend-items {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-family: 'Newsreader', serif;
+    font-size: 13.5px;
+  }
+  .legend-items span {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .legend-items .swatch {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+  }
+  .legend-items .swatch.sq { border-radius: 2px; }
+
+  /* ─── Unified table ──────────────────────── */
+  .tablewrap {
+    border: 1.5px solid var(--rule);
+    background: var(--paper-3);
+    overflow-x: auto;
+    margin-bottom: 24px;
+  }
+  table.atlas {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12.5px;
+  }
+  table.atlas thead th {
+    background: var(--ink);
+    color: var(--paper);
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 500;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    padding: 14px 10px;
+    border-right: 1px solid var(--ink-soft);
+    text-align: left;
+    white-space: nowrap;
+    vertical-align: bottom;
+  }
+  table.atlas thead th:last-child { border-right: none; }
+  table.atlas thead th.num { text-align: right; }
+  table.atlas thead th .hint {
+    display: block;
+    font-size: 9px;
+    color: var(--muted-2);
+    letter-spacing: 0.1em;
+    margin-top: 3px;
+    text-transform: none;
+    font-style: italic;
+  }
+
+  table.atlas tbody tr {
+    border-bottom: 1px solid var(--rule);
+    position: relative;
+    transition: background 0.15s;
+    opacity: 0;
+    transform: translateY(8px);
+    animation: row-in 0.5s cubic-bezier(0.2, 0.6, 0.2, 1) forwards;
+  }
+  @keyframes row-in {
+    to { opacity: 1; transform: translateY(0); }
+  }
+  /* stagger */
+  table.atlas tbody tr:nth-child(1)  { animation-delay: 0.05s; }
+  table.atlas tbody tr:nth-child(2)  { animation-delay: 0.10s; }
+  table.atlas tbody tr:nth-child(3)  { animation-delay: 0.15s; }
+  table.atlas tbody tr:nth-child(4)  { animation-delay: 0.20s; }
+  table.atlas tbody tr:nth-child(5)  { animation-delay: 0.25s; }
+  table.atlas tbody tr:nth-child(6)  { animation-delay: 0.30s; }
+  table.atlas tbody tr:nth-child(7)  { animation-delay: 0.35s; }
+  table.atlas tbody tr:nth-child(8)  { animation-delay: 0.40s; }
+  table.atlas tbody tr:nth-child(9)  { animation-delay: 0.45s; }
+  table.atlas tbody tr:nth-child(10) { animation-delay: 0.50s; }
+  table.atlas tbody tr:nth-child(11) { animation-delay: 0.55s; }
+  table.atlas tbody tr:nth-child(12) { animation-delay: 0.60s; }
+  table.atlas tbody tr:nth-child(13) { animation-delay: 0.65s; }
+  table.atlas tbody tr:nth-child(14) { animation-delay: 0.70s; }
+  table.atlas tbody tr:nth-child(15) { animation-delay: 0.75s; }
+
+  table.atlas tbody tr:hover { background: var(--paper-2); }
+  table.atlas tbody tr.missing { background: rgba(185, 74, 35, 0.045); }
+  table.atlas tbody tr.missing:hover { background: rgba(185, 74, 35, 0.085); }
+
+  table.atlas tbody td {
+    padding: 14px 10px;
+    border-right: 1px solid var(--rule);
+    vertical-align: middle;
+  }
+  table.atlas tbody td:last-child { border-right: none; }
+  table.atlas tbody td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  table.atlas tbody td.idx {
+    font-size: 11px;
+    color: var(--muted);
+    width: 36px;
+  }
+  table.atlas tbody td.name {
+    font-family: 'Fraunces', serif;
+    font-variation-settings: "opsz" 24, "wght" 500;
+    font-size: 17px;
+    letter-spacing: -0.005em;
+    color: var(--ink);
+    white-space: nowrap;
+  }
+  table.atlas tbody td.name a {
+    color: inherit;
+    text-decoration: none;
+    border-bottom: 1.5px solid transparent;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  table.atlas tbody td.name a:hover { border-bottom-color: var(--accent); color: var(--accent); }
+  table.atlas tbody td.name .src {
+    display: block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9.5px;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+    margin-top: 3px;
+    font-style: normal;
+    text-transform: lowercase;
+  }
+
+  /* typology pill */
+  .pill {
+    display: inline-block;
+    padding: 3px 9px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border-radius: 0;
+    color: var(--paper-3);
+    font-weight: 500;
+    line-height: 1.4;
+    white-space: nowrap;
+  }
+  .pill.indoor   { background: var(--t-indoor); }
+  .pill.outdoor  { background: var(--t-outdoor); }
+  .pill.mixed    { background: var(--t-mixed); }
+  .pill.object   { background: var(--t-object); }
+  .pill.real     { background: var(--t-real); }
+  .pill.synth    { background: var(--t-synth); }
+  .pill.static   { background: transparent; color: var(--ink); border: 1px solid var(--ink); }
+  .pill.dynamic  { background: var(--accent); }
+
+  /* task chips — compact set */
+  .tasks {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 3px;
+    max-width: 180px;
+  }
+  .task {
+    display: inline-block;
+    padding: 2px 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--paper-3);
+    font-weight: 500;
+    white-space: nowrap;
+    line-height: 1.3;
+  }
+  .task.mono   { background: var(--task-mono); }
+  .task.video  { background: var(--task-video); }
+  .task.recon  { background: var(--task-recon); }
+  .task.pose   { background: var(--task-pose); }
+  .task.adhoc  { background: var(--task-ad-hoc); }
+  .task.absent { background: transparent; color: var(--muted-2); border: 1px solid var(--muted-2); }
+
+  /* modality grid (R D M P K) */
+  .mods {
+    display: inline-flex;
+    gap: 3px;
+  }
+  .mods span {
+    display: inline-flex;
+    width: 22px;
+    height: 22px;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--rule);
+    background: var(--paper);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--muted-2);
+  }
+  .mods span.on {
+    background: var(--ink);
+    color: var(--paper);
+    border-color: var(--ink);
+  }
+  .mods span.on.depth   { background: var(--t-indoor); border-color: var(--t-indoor); }
+  .mods span.on.mask    { background: var(--t-object); border-color: var(--t-object); }
+  .mods span.on.pose    { background: var(--accent-2); border-color: var(--accent-2); }
+  .mods span.on.k       { background: var(--amber); border-color: var(--amber); }
+
+  .check {
+    display: inline-block;
+    width: 18px;
+    height: 18px;
+    text-align: center;
+    line-height: 18px;
+    font-weight: 600;
+    color: var(--olive);
+    font-size: 14px;
+  }
+  .cross {
+    display: inline-block;
+    width: 18px;
+    height: 18px;
+    text-align: center;
+    line-height: 18px;
+    font-weight: 600;
+    color: var(--accent);
+    font-size: 14px;
+  }
+  .em-dash { color: var(--muted-2); }
+
+  /* mixture mini-bar in row */
+  .weight-bar {
+    display: inline-block;
+    width: 60px;
+    height: 6px;
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    position: relative;
+    margin-left: 8px;
+    vertical-align: middle;
+  }
+  .weight-bar i {
+    display: block;
+    height: 100%;
+    background: var(--accent);
+  }
+
+  /* status chip */
+  .status {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 4px 8px;
+    border: 1px solid;
+    white-space: nowrap;
+  }
+  .status.ok      { color: var(--olive);  border-color: var(--olive); }
+  .status.missing { color: var(--accent); border-color: var(--accent); background: rgba(185, 74, 35, 0.08); }
+
+  /* path-text */
+  .path {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-soft);
+    white-space: nowrap;
+  }
+  tr.missing .path { color: var(--muted-2); text-decoration: line-through; }
+
+  /* ─── Footnotes ──────────────────────────── */
+  .notes {
+    columns: 2;
+    column-gap: 64px;
+    margin-top: 12px;
+    font-family: 'Newsreader', serif;
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--ink-soft);
+  }
+  .notes p { margin: 0 0 14px; break-inside: avoid; }
+  .notes p strong {
+    font-family: 'Fraunces', serif;
+    font-variation-settings: "opsz" 24, "wght" 600;
+    color: var(--ink);
+    font-weight: normal;
+  }
+  .notes code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12.5px;
+    color: var(--accent);
+    background: var(--paper-3);
+    padding: 1px 5px;
+    border: 1px solid var(--rule);
+  }
+
+  /* ─── Footer ─────────────────────────────── */
+  footer {
+    margin-top: 96px;
+    padding-top: 28px;
+    border-top: 1.5px solid var(--rule);
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  footer .mark {
+    font-family: 'Fraunces', serif;
+    font-variation-settings: "opsz" 48, "wght" 800;
+    font-size: 20px;
+    color: var(--ink);
+    letter-spacing: -0.02em;
+    text-transform: none;
+  }
+  footer .mark em { font-style: italic; color: var(--accent); font-weight: 500; }
+
+  /* ─── Recipe step (for §04) ────────────────── */
+  .recipe { display: grid; gap: 32px; }
+  .recipe-step {
+    display: grid;
+    grid-template-columns: 96px 1fr;
+    gap: 28px;
+    align-items: start;
+  }
+  .recipe-num {
+    font-family: 'Fraunces', serif;
+    font-variation-settings: "opsz" 144, "wght" 300;
+    font-style: italic;
+    font-size: 76px; line-height: 0.85;
+    color: var(--accent);
+    letter-spacing: -0.05em;
+    text-align: right;
+    padding-right: 4px;
+    border-right: 1px solid var(--rule);
+  }
+  .recipe-body h3 {
+    font-family: 'Fraunces', serif;
+    font-variation-settings: "opsz" 36, "wght" 500;
+    font-size: 22px; margin: 0 0 8px;
+    letter-spacing: -0.01em;
+  }
+  .recipe-body h3 em { font-style: italic; color: var(--accent); }
+  .recipe-body p {
+    margin: 0 0 12px;
+    font-size: 15px;
+    color: var(--ink-soft);
+    line-height: 1.6;
+  }
+  .recipe-body strong {
+    font-family: 'Fraunces', serif;
+    font-variation-settings: "opsz" 24, "wght" 600;
+    color: var(--ink);
+    font-weight: normal;
+  }
+
+  /* ─── Code block ───────────────────────────── */
+  .code {
+    background: var(--ink-deep, #11151c);
+    color: #e8e3d4;
+    border: 1px solid var(--ink);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12.5px;
+    line-height: 1.65;
+    margin: 12px 0;
+    overflow: hidden;
+  }
+  .code-bar {
+    background: #1a1f2e;
+    color: #6e7891;
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    padding: 7px 14px;
+    border-bottom: 1px solid #2a2f3e;
+    display: flex; justify-content: space-between;
+    font-weight: 500;
+  }
+  .code pre {
+    margin: 0;
+    padding: 16px 22px;
+    overflow-x: auto;
+    white-space: pre;
+  }
+  .code .kw { color: #d7a843; }     /* keyword */
+  .code .cls { color: #6dbac4; }    /* class name */
+  .code .fn { color: #b094c4; }     /* function */
+  .code .str { color: #8aaf78; }    /* string */
+  .code .com { color: #6e7891; font-style: italic; } /* comment */
+  .code .num { color: #c9b27a; }
+  .code .var { color: #d96846; }    /* highlighted identifier */
+  .code .self { color: #6dbac4; font-style: italic; }
+
+  /* ─── Contract schema table ───────────────── */
+  .schema {
+    width: 100%;
+    border-collapse: collapse;
+    border: 1.5px solid var(--rule);
+    background: var(--paper-3);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    margin: 16px 0;
+  }
+  .schema thead th {
+    background: var(--ink);
+    color: var(--paper);
+    text-align: left;
+    padding: 11px 12px;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    border-right: 1px solid var(--ink-soft);
+  }
+  .schema thead th:last-child { border-right: none; }
+  .schema tbody td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--rule);
+    border-right: 1px solid var(--rule);
+    vertical-align: top;
+  }
+  .schema tbody td:last-child { border-right: none; }
+  .schema tbody tr:last-child td { border-bottom: none; }
+  .schema tbody tr:hover { background: var(--paper-2); }
+  .schema .field { font-weight: 600; color: var(--accent); white-space: nowrap; }
+  .schema .ty { color: var(--accent-2); font-weight: 500; }
+  .schema .desc {
+    font-family: 'Newsreader', serif;
+    font-size: 13.5px;
+    color: var(--ink-soft);
+    line-height: 1.5;
+  }
+  .schema .req {
+    display: inline-block;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 2px 6px;
+    border: 1px solid;
+    line-height: 1.3;
+  }
+  .schema .req.must     { color: var(--accent); border-color: var(--accent); }
+  .schema .req.recommend{ color: var(--accent-2); border-color: var(--accent-2); }
+  .schema .req.optional { color: var(--muted); border-color: var(--muted); }
+
+  /* callouts reused */
+  .callout {
+    border-left: 3px solid;
+    padding: 14px 18px;
+    margin: 14px 0;
+    font-size: 14px;
+    line-height: 1.55;
+    font-family: 'Newsreader', serif;
+  }
+  .callout strong {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; letter-spacing: 0.2em;
+    text-transform: uppercase;
+    display: block; margin-bottom: 4px;
+    font-weight: 600;
+  }
+  .callout code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12.5px;
+    background: var(--paper);
+    padding: 1px 5px;
+    border: 1px solid var(--rule);
+  }
+  .callout.warn { background: rgba(185, 74, 35, 0.07); border-color: var(--accent); }
+  .callout.warn strong { color: var(--accent); }
+  .callout.note { background: rgba(30, 74, 82, 0.06); border-color: var(--accent-2); }
+  .callout.note strong { color: var(--accent-2); }
+  .callout.tip  { background: rgba(91, 103, 48, 0.07); border-color: var(--olive); }
+  .callout.tip strong { color: var(--olive); }
+
+  /* small ornament between sections */
+  .ornament {
+    text-align: center;
+    color: var(--accent);
+    font-family: 'Fraunces', serif;
+    font-size: 20px;
+    margin: 64px 0 0;
+    letter-spacing: 1em;
+  }
+
+  @media (max-width: 1100px) {
+    .container { padding: 40px 28px 64px; }
+    .masthead { grid-template-columns: 1fr; gap: 24px; }
+    .mast-right { border-left: none; padding-left: 0; text-align: left; border-top: 1px solid var(--rule); padding-top: 20px; }
+    .stats { grid-template-columns: repeat(3, 1fr); }
+    .stat:nth-child(3n) { border-right: none; }
+    .legend { grid-template-columns: 1fr 1fr; }
+    .legend > div:nth-child(2n) { border-right: none; }
+    .notes { columns: 1; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- ════ MASTHEAD ══════════════════════════════════════════════ -->
+  <section class="masthead">
+    <div class="mast-left">
+      <div class="eyebrow"><span class="sigil"></span>StreamVGGT · Reference Atlas · Vol. I</div>
+      <h1>Training<br>Data <em>Atlas</em></h1>
+      <p class="subtitle">A unified specification of the fifteen geometric perception
+      datasets distilled into the streaming 4D model — every modality,
+      every weight, every preprocessing trail.</p>
+    </div>
+    <dl class="mast-right">
+      <dt>Document</dt><dd>DAT-001 · v1.0</dd>
+      <dt>Compiled</dt><dd>2026·05·19</dd>
+      <dt>Schema</dt><dd>CUT3R-style</dd>
+      <dt>Mixture</dt><dd>Weighted Concat</dd>
+      <dt>Views/Sample</dt><dd>10 · Multi-aspect</dd>
+      <dt>Resolution</dt><dd>518 · long side</dd>
+    </dl>
+  </section>
+
+  <!-- ════ STAT STRIP ════════════════════════════════════════════ -->
+  <section class="stats">
+    <div class="stat">
+      <div class="idx">§01</div>
+      <div class="num">15<sup>†</sup></div>
+      <div class="label">Datasets in mixture</div>
+    </div>
+    <div class="stat">
+      <div class="idx">§02</div>
+      <div class="num">38,750</div>
+      <div class="label">Samples per epoch</div>
+    </div>
+    <div class="stat">
+      <div class="idx">§03</div>
+      <div class="num">10</div>
+      <div class="label">Frames per sample</div>
+    </div>
+    <div class="stat">
+      <div class="idx">§04</div>
+      <div class="num">≈25<sup>TB</sup></div>
+      <div class="label">Raw disk footprint</div>
+    </div>
+    <div class="stat">
+      <div class="idx">§05</div>
+      <div class="num">13<sup>/15</sup></div>
+      <div class="label">Train sets on disk</div>
+    </div>
+    <div class="stat">
+      <div class="idx">§06</div>
+      <div class="num">8</div>
+      <div class="label">Eval benchmarks</div>
+    </div>
+  </section>
+
+  <!-- ════ MIXTURE BAR ═══════════════════════════════════════════ -->
+  <div class="sec-head">
+    <div class="sec-num">§ 01</div>
+    <h2>Mixture <em>composition</em></h2>
+    <div class="meta">Weight / total = % share · hover for label</div>
+  </div>
+
+  <div class="mix">
+    <div class="mix-bar" id="mixbar"></div>
+    <div class="mix-axis">
+      <span>0</span><span>25 %</span><span>50 %</span><span>75 %</span><span>100 %</span>
+    </div>
+  </div>
+
+  <!-- ════ LEGEND ════════════════════════════════════════════════ -->
+  <div class="legend" aria-label="Typology legend">
+    <div>
+      <div class="legend-title">Domain</div>
+      <div class="legend-items">
+        <span><i class="swatch sq" style="background:var(--t-indoor)"></i> Indoor</span>
+        <span><i class="swatch sq" style="background:var(--t-outdoor)"></i> Outdoor</span>
+        <span><i class="swatch sq" style="background:var(--t-mixed)"></i> Mixed</span>
+        <span><i class="swatch sq" style="background:var(--t-object)"></i> Object-centric</span>
+      </div>
+    </div>
+    <div>
+      <div class="legend-title">World</div>
+      <div class="legend-items">
+        <span><i class="swatch sq" style="background:var(--t-real)"></i> Real-world</span>
+        <span><i class="swatch sq" style="background:var(--t-synth)"></i> Synthetic</span>
+      </div>
+    </div>
+    <div>
+      <div class="legend-title">Motion</div>
+      <div class="legend-items">
+        <span><i class="swatch sq" style="background:transparent;border:1px solid var(--ink)"></i> Static scene</span>
+        <span><i class="swatch sq" style="background:var(--t-dynamic)"></i> Dynamic scene</span>
+      </div>
+    </div>
+    <div>
+      <div class="legend-title">Modalities (R / D / M / P / K)</div>
+      <div class="legend-items" style="font-size:12.5px">
+        <span><b style="color:var(--ink)">R</b> · RGB images</span>
+        <span><b style="color:var(--t-indoor)">D</b> · Depth maps</span>
+        <span><b style="color:var(--t-object)">M</b> · Valid masks</span>
+        <span><b style="color:var(--accent-2)">P</b> · Camera pose (extrinsics)</span>
+        <span><b style="color:var(--amber)">K</b> · Camera intrinsics</span>
+      </div>
+    </div>
+    <div>
+      <div class="legend-title">Status</div>
+      <div class="legend-items">
+        <span style="color:var(--olive)">● available on /jfs/Data_4DFF</span>
+        <span style="color:var(--accent)">● missing, requires preprocessing</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════ UNIFIED TABLE ════════════════════════════════════════ -->
+  <div class="sec-head">
+    <div class="sec-num">§ 02</div>
+    <h2>The <em>fifteen</em> · unified specification</h2>
+    <div class="meta">All columns derived from config/train.yaml &amp; CUT3R docs/preprocess.md</div>
+  </div>
+
+  <div class="tablewrap">
+    <table class="atlas" id="dtable">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Dataset <span class="hint">/ source</span></th>
+          <th>Domain</th>
+          <th>World</th>
+          <th>Motion</th>
+          <th>Modalities <span class="hint">R · D · M · P · K</span></th>
+          <th>Metric <span class="hint">true scale?</span></th>
+          <th class="num">Scenes <span class="hint">on disk</span></th>
+          <th class="num">Weight <span class="hint">samples/epoch</span></th>
+          <th class="num">Share <span class="hint">% of mixture</span></th>
+          <th>Path <span class="hint">data/train/*</span></th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- ① CO3Dv2 -->
+        <tr>
+          <td class="idx">01</td>
+          <td class="name">
+            <a href="https://github.com/facebookresearch/co3d" target="_blank" rel="noopener">CO3Dv2</a>
+            <span class="src">Common Objects 3D · Meta</span>
+          </td>
+          <td><span class="pill object">Object</span></td>
+          <td><span class="pill real">Real</span></td>
+          <td><span class="pill static">Static</span></td>
+          <td><div class="mods"><span class="on">R</span><span class="on depth">D</span><span class="on mask">M</span><span class="on pose">P</span><span class="on k">K</span></div></td>
+          <td><span class="em-dash">— (rel.)</span></td>
+          <td class="num">2,511 <span style="color:var(--muted-2);font-size:10px">· 53 cats</span></td>
+          <td class="num">4,500</td>
+          <td class="num">11.61% <span class="weight-bar"><i style="width:97%"></i></span></td>
+          <td><span class="path">processed_co3d/</span></td>
+          <td><span class="status ok">available</span></td>
+        </tr>
+        <!-- ② WildRGB-D -->
+        <tr>
+          <td class="idx">02</td>
+          <td class="name">
+            <a href="https://github.com/wildrgbd/wildrgbd/" target="_blank" rel="noopener">WildRGB-D</a>
+            <span class="src">In-the-wild object captures</span>
+          </td>
+          <td><span class="pill object">Object</span></td>
+          <td><span class="pill real">Real</span></td>
+          <td><span class="pill static">Static</span></td>
+          <td><div class="mods"><span class="on">R</span><span class="on depth">D</span><span class="on mask">M</span><span class="on pose">P</span><span class="on k">K</span></div></td>
+          <td><span class="check">✓</span></td>
+          <td class="num">2,754 <span style="color:var(--muted-2);font-size:10px">· 48 cats</span></td>
+          <td class="num">4,500</td>
+          <td class="num">11.61% <span class="weight-bar"><i style="width:97%"></i></span></td>
+          <td><span class="path">wildrgbd/</span></td>
+          <td><span class="status ok">available</span></td>
+        </tr>
+        <!-- ③ ARKitScenes -->
+        <tr>
+          <td class="idx">03</td>
+          <td class="name">
+            <a href="https://github.com/apple/ARKitScenes" target="_blank" rel="noopener">ARKitScenes</a>
+            <span class="src">RGB-D room scans · Apple</span>
+          </td>
+          <td><span class="pill indoor">Indoor</span></td>
+          <td><span class="pill real">Real</span></td>
+          <td><span class="pill static">Static</span></td>
+          <td><div class="mods"><span class="on">R</span><span class="on depth">D</span><span>M</span><span class="on pose">P</span><span class="on k">K</span></div></td>
+          <td><span class="check">✓</span></td>
+          <td class="num">4,358 <span style="color:var(--muted-2);font-size:10px">· tr+te</span></td>
+          <td class="num">4,500</td>
+          <td class="num">11.61% <span class="weight-bar"><i style="width:97%"></i></span></td>
+          <td><span class="path">processed_arkitscenes/</span></td>
+          <td><span class="status ok">available</span></td>
+        </tr>
+        <!-- ④ ARKitScenes HighRes -->
+        <tr class="missing">
+          <td class="idx">04</td>
+          <td class="name">
+            <a href="https://github.com/apple/ARKitScenes" target="_blank" rel="noopener">ARKitScenes-HR</a>
+            <span class="src">High-resolution depth subset</span>
+          </td>
+          <td><span class="pill indoor">Indoor</span></td>
+          <td><span class="pill real">Real</span></td>
+          <td><span class="pill static">Static</span></td>
+          <td><div class="mods"><span class="on">R</span><span class="on depth">D</span><span>M</span><span class="on pose">P</span><span class="on k">K</span></div></td>
+          <td><span class="check">✓</span></td>
+          <td class="num"><span class="em-dash">—</span></td>
+          <td class="num">2,250</td>
+          <td class="num">5.81% <span class="weight-bar"><i style="width:48%"></i></span></td>
+          <td><span class="path">processed_arkitscenes_highres/</span></td>
+          <td><span class="status missing">missing</span></td>
+        </tr>
+        <!-- ⑤ ScanNet++ -->
+        <tr class="missing">
+          <td class="idx">05</td>
+          <td class="name">
+            <a href="https://kaldir.vc.in.tum.de/scannetpp/" target="_blank" rel="noopener">ScanNet++</a>
+            <span class="src">High-fidelity 3D indoor · TUM</span>
+          </td>
+          <td><span class="pill indoor">Indoor</span></td>
+          <td><span class="pill real">Real</span></td>
+          <td><span class="pill static">Static</span></td>
+          <td><div class="mods"><span class="on">R</span><span class="on depth">D</span><span>M</span><span class="on pose">P</span><span class="on k">K</span></div></td>
+          <td><span class="check">✓</span></td>
+          <td class="num"><span class="em-dash">—</span></td>
+          <td class="num">2,250</td>
+          <td class="num">5.81% <span class="weight-bar"><i style="width:48%"></i></span></td>
+          <td><span class="path">processed_scannetpp/</span></td>
+          <td><span class="status missing">missing</span></td>
+        </tr>
+        <!-- ⑥ ScanNet -->
+        <tr>
+          <td class="idx">06</td>
+          <td class="name">
+            <a href="http://www.scan-net.org/ScanNet/" target="_blank" rel="noopener">ScanNet</a>
+            <span class="src">Indoor RGB-D scans</span>
+          </td>
+          <td><span class="pill indoor">Indoor</span></td>
+          <td><span class="pill real">Real</span></td>
+          <td><span class="pill static">Static</span></td>
+          <td><div class="mods"><span class="on">R</span><span class="on depth">D</span><span>M</span><span class="on pose">P</span><span class="on k">K</span></div></td>
+          <td><span class="check">✓</span></td>
+          <td class="num">1,510</td>
+          <td class="num">4,500</td>
+          <td class="num">11.61% <span class="weight-bar"><i style="width:97%"></i></span></td>
+          <td><span class="path">processed_scannet/</span></td>
+          <td><span class="status ok">available</span></td>
+        </tr>
+        <!-- ⑦ Hypersim -->
+        <tr>
+          <td class="idx">07</td>
+          <td class="name">
+            <a href="https://github.com/apple/ml-hypersim" target="_blank" rel="noopener">Hypersim</a>
+            <span class="src">Photoreal synthetic indoor · Apple</span>
+          </td>
+          <td><span class="pill indoor">Indoor</span></td>
+          <td><span class="pill synth">Synth</span></td>
+          <td><span class="pill static">Static</span></td>
+          <td><div class="mods"><span class="on">R</span><span class="on depth">D</span><span>M</span><span class="on pose">P</span><span class="on k">K</span></div></td>
+          <td><span class="check">✓</span></td>
+          <td class="num">457</td>
+          <td class="num">1,200</td>
+          <td class="num">3.10% <span class="weight-bar"><i style="width:26%"></i></span></td>
+          <td><span class="path">hypersim/</span></td>
+          <td><span class="status ok">available</span></td>
+        </tr>
+        <!-- ⑧ BlendedMVS -->
+        <tr>
+          <td class="idx">08</td>
+          <td class="name">
+            <a href="https://github.com/YoYo000/BlendedMVS" target="_blank" rel="noopener">BlendedMVS</a>
+            <span class="src">Multi-view stereo benchmark</span>
+          </td>
+          <td><span class="pill mixed">Mixed</span></td>
+          <td><span class="pill synth">Synth</span></td>
+          <td><span class="pill static">Static</span></td>
+          <td><div class="mods"><span class="on">R</span><span class="on depth">D</span><span>M</span><span class="on pose">P</span><span class="on k">K</span></div></td>
+          <td><span class="em-dash">— (rel.)</span></td>
+          <td class="num">502</td>
+          <td class="num">2,250</td>
+          <td class="num">5.81% <span class="weight-bar"><i style="width:48%"></i></span></td>
+          <td><span class="path">processed_blendedmvs/</span></td>
+          <td><span class="status ok">available</span></td>
+        </tr>
+        <!-- ⑨ MegaDepth -->
+        <tr>
+          <td class="idx">09</td>
+          <td class="name">
+            <a href="https://www.cs.cornell.edu/projects/megadepth/" target="_blank" rel="noopener">MegaDepth</a>
+            <span class="src">Internet landmark SfM · Cornell</span>
+          </td>
+          <td><span class="pill outdoor">Outdoor</span></td>
+          <td><span class="pill real">Real</span></td>
+          <td><span class="pill static">Static</span></td>
+          <td><div class="mods"><span class="on">R</span><span class="on depth">D</span><span>M</span><span class="on pose">P</span><span class="on k">K</span></div></td>
+          <td><span class="em-dash">— (rel.)</span></td>
+          <td class="num">176</td>
+          <td class="num">2,250</td>
+          <td class="num">5.81% <span class="weight-bar"><i style="width:48%"></i></span></td>
+          <td><span class="path">processed_megadepth/</span></td>
+          <td><span class="status ok">available</span></td>
+        </tr>
+        <!-- ⑩ Waymo -->
+        <tr>
+          <td class="idx">10</td>
+          <td class="name">
+            <a href="https://github.com/waymo-research/waymo-open-dataset" target="_blank" rel="noopener">Waymo</a>
+            <span class="src">Autonomous driving · Waymo</span>
+          </td>
+          <td><span class="pill outdoor">Outdoor</span></td>
+          <td><span class="pill real">Real</span></td>
+          <td><span class="pill dynamic">Dynamic</span></td>
+          <td><div class="mods"><span class="on">R</span><span class="on depth">D</span><span>M</span><span class="on pose">P</span><span class="on k">K</span></div></td>
+          <td><span class="check">✓</span></td>
+          <td class="num">799</td>
+          <td class="num">2,250</td>
+          <td class="num">5.81% <span class="weight-bar"><i style="width:48%"></i></span></td>
+          <td><span class="path">waymo/</span></td>
+          <td><span class="status ok">available</span></td>
+        </tr>
+        <!-- ⑪ Virtual KITTI 2 -->
+        <tr>
+          <td class="idx">11</td>
+          <td class="name">
+            <a href="https://europe.naverlabs.com/research/computer-vision/proxy-virtual-worlds-vkitti-2/" target="_blank" rel="noopener">Virtual KITTI 2</a>
+            <span class="src">Photoreal driving sim · Naver</span>
+          </td>
+          <td><span class="pill outdoor">Outdoor</span></td>
+          <td><span class="pill synth">Synth</span></td>
+          <td><span class="pill dynamic">Dynamic</span></td>
+          <td><div class="mods"><span class="on">R</span><span class="on depth">D</span><span>M</span><span class="on pose">P</span><span class="on k">K</span></div></td>
+          <td><span class="check">✓</span></td>
+          <td class="num">5 <span style="color:var(--muted-2);font-size:10px">· × variants</span></td>
+          <td class="num">2,250</td>
+          <td class="num">5.81% <span class="weight-bar"><i style="width:48%"></i></span></td>
+          <td><span class="path">processed_vkitti/</span></td>
+          <td><span class="status ok">available</span></td>
+        </tr>
+        <!-- ⑫ OmniObject3D -->
+        <tr>
+          <td class="idx">12</td>
+          <td class="name">
+            <a href="https://omniobject3d.github.io/" target="_blank" rel="noopener">OmniObject3D</a>
+            <span class="src">Large-scale object 3D</span>
+          </td>
+          <td><span class="pill object">Object</span></td>
+          <td><span class="pill synth">Synth</span></td>
+          <td><span class="pill static">Static</span></td>
+          <td><div class="mods"><span class="on">R</span><span class="on depth">D</span><span>M</span><span class="on pose">P</span><span class="on k">K</span></div></td>
+          <td><span class="check">✓</span></td>
+          <td class="num">5,914 <span style="color:var(--muted-2);font-size:10px">· 216 cats</span></td>
+          <td class="num">1,800</td>
+          <td class="num">4.65% <span class="weight-bar"><i style="width:39%"></i></span></td>
+          <td><span class="path">omniobject3d/</span></td>
+          <td><span class="status ok">available</span></td>
+        </tr>
+        <!-- ⑬ Spring -->
+        <tr>
+          <td class="idx">13</td>
+          <td class="name">
+            <a href="https://spring-benchmark.org/" target="_blank" rel="noopener">Spring</a>
+            <span class="src">Stereo + flow benchmark</span>
+          </td>
+          <td><span class="pill mixed">Mixed</span></td>
+          <td><span class="pill synth">Synth</span></td>
+          <td><span class="pill dynamic">Dynamic</span></td>
+          <td><div class="mods"><span class="on">R</span><span class="on depth">D</span><span>M</span><span class="on pose">P</span><span class="on k">K</span></div></td>
+          <td><span class="check">✓</span></td>
+          <td class="num">37</td>
+          <td class="num">1,800</td>
+          <td class="num">4.65% <span class="weight-bar"><i style="width:39%"></i></span></td>
+          <td><span class="path">spring/</span></td>
+          <td><span class="status ok">available</span></td>
+        </tr>
+        <!-- ⑭ MVS-Synth -->
+        <tr>
+          <td class="idx">14</td>
+          <td class="name">
+            <a href="https://phuang17.github.io/DeepMVS/mvs-synth.html" target="_blank" rel="noopener">MVS-Synth</a>
+            <span class="src">GTA-V multi-view synthetic</span>
+          </td>
+          <td><span class="pill outdoor">Outdoor</span></td>
+          <td><span class="pill synth">Synth</span></td>
+          <td><span class="pill dynamic">Dynamic</span></td>
+          <td><div class="mods"><span class="on">R</span><span class="on depth">D</span><span>M</span><span class="on pose">P</span><span class="on k">K</span></div></td>
+          <td><span class="check">✓</span></td>
+          <td class="num">120</td>
+          <td class="num">450</td>
+          <td class="num">1.16% <span class="weight-bar"><i style="width:10%"></i></span></td>
+          <td><span class="path">mvs_synth/</span></td>
+          <td><span class="status ok">available</span></td>
+        </tr>
+        <!-- ⑮ PointOdyssey -->
+        <tr>
+          <td class="idx">15</td>
+          <td class="name">
+            <a href="https://pointodyssey.com/" target="_blank" rel="noopener">PointOdyssey</a>
+            <span class="src">Long-form point tracking</span>
+          </td>
+          <td><span class="pill mixed">Mixed</span></td>
+          <td><span class="pill synth">Synth</span></td>
+          <td><span class="pill dynamic">Dynamic</span></td>
+          <td><div class="mods"><span class="on">R</span><span class="on depth">D</span><span>M</span><span class="on pose">P</span><span class="on k">K</span></div></td>
+          <td><span class="check">✓</span></td>
+          <td class="num">131</td>
+          <td class="num">2,250</td>
+          <td class="num">5.81% <span class="weight-bar"><i style="width:48%"></i></span></td>
+          <td><span class="path">point_odyssey/</span></td>
+          <td><span class="status ok">available</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div style="display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--muted);letter-spacing:0.1em;text-transform:uppercase;padding-top:8px">
+    <span>† Counts read from /jfs/Data_4DFF/train_data on 2026-05-19</span>
+    <span>Σ = 38,750 samples / epoch · 13 of 15 datasets available</span>
+  </div>
+
+  <div class="ornament">· · ·</div>
+
+  <!-- ════ EVALUATION TABLE ══════════════════════════════════════ -->
+  <div class="sec-head">
+    <div class="sec-num">§ 03</div>
+    <h2>Evaluation <em>benchmarks</em></h2>
+    <div class="meta">Tasks defined under src/eval/{monodepth,video_depth,mv_recon,pose_evaluation}</div>
+  </div>
+
+  <!-- task legend strip -->
+  <div class="legend" style="grid-template-columns: repeat(4, 1fr); margin-top: 0; margin-bottom: 24px;" aria-label="Evaluation tasks legend">
+    <div>
+      <div class="legend-title">Task · M-D</div>
+      <div class="legend-items" style="font-size:13px">
+        <span><i class="swatch sq" style="background:var(--task-mono)"></i> Monocular depth · single-frame absolute / scaled depth</span>
+      </div>
+    </div>
+    <div>
+      <div class="legend-title">Task · V-D</div>
+      <div class="legend-items" style="font-size:13px">
+        <span><i class="swatch sq" style="background:var(--task-video)"></i> Video depth · temporally consistent sequences</span>
+      </div>
+    </div>
+    <div>
+      <div class="legend-title">Task · M-R</div>
+      <div class="legend-items" style="font-size:13px">
+        <span><i class="swatch sq" style="background:var(--task-recon)"></i> Multi-view reconstruction · point-cloud Chamfer / Acc / Comp</span>
+      </div>
+    </div>
+    <div>
+      <div class="legend-title">Task · POSE</div>
+      <div class="legend-items" style="font-size:13px">
+        <span><i class="swatch sq" style="background:var(--task-pose)"></i> Camera pose / trajectory · ATE-RMSE, RPE</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="tablewrap">
+    <table class="atlas" id="etable">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Benchmark <span class="hint">/ source</span></th>
+          <th>Domain</th>
+          <th>World</th>
+          <th>Motion</th>
+          <th>Modalities <span class="hint">R · D · M · P · K</span></th>
+          <th>Tasks <span class="hint">M-D · V-D · M-R · POSE</span></th>
+          <th class="num">Sequences <span class="hint">on disk</span></th>
+          <th class="num">Size <span class="hint">disk · GB</span></th>
+          <th>Path <span class="hint">data/eval/*</span></th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- ① Sintel -->
+        <tr>
+          <td class="idx">01</td>
+          <td class="name">
+            <a href="http://sintel.is.tue.mpg.de/" target="_blank" rel="noopener">MPI Sintel</a>
+            <span class="src">Open-source CG film · MPI</span>
+          </td>
+          <td><span class="pill mixed">Mixed</span></td>
+          <td><span class="pill synth">Synth</span></td>
+          <td><span class="pill dynamic">Dynamic</span></td>
+          <td><div class="mods"><span class="on">R</span><span class="on depth">D</span><span class="on mask">M</span><span class="on pose">P</span><span class="on k">K</span></div></td>
+          <td>
+            <div class="tasks">
+              <span class="task mono">M-D</span>
+              <span class="task video">V-D</span>
+              <span class="task absent">M-R</span>
+              <span class="task pose">POSE</span>
+            </div>
+          </td>
+          <td class="num">23 <span style="color:var(--muted-2);font-size:10px">· scenes</span></td>
+          <td class="num">7.1</td>
+          <td><span class="path">sintel/</span></td>
+          <td><span class="status ok">available</span></td>
+        </tr>
+        <!-- ② Bonn -->
+        <tr>
+          <td class="idx">02</td>
+          <td class="name">
+            <a href="https://www.ipb.uni-bonn.de/data/rgbd-dynamic-dataset/" target="_blank" rel="noopener">Bonn RGB-D Dynamic</a>
+            <span class="src">Dynamic indoor RGB-D · Uni Bonn</span>
+          </td>
+          <td><span class="pill indoor">Indoor</span></td>
+          <td><span class="pill real">Real</span></td>
+          <td><span class="pill dynamic">Dynamic</span></td>
+          <td><div class="mods"><span class="on">R</span><span class="on depth">D</span><span>M</span><span class="on pose">P</span><span class="on k">K</span></div></td>
+          <td>
+            <div class="tasks">
+              <span class="task mono">M-D</span>
+              <span class="task video">V-D</span>
+              <span class="task absent">M-R</span>
+              <span class="task pose">POSE</span>
+            </div>
+          </td>
+          <td class="num">26 <span style="color:var(--muted-2);font-size:10px">· seqs</span></td>
+          <td class="num">18.0</td>
+          <td><span class="path">bonn/</span></td>
+          <td><span class="status ok">available</span></td>
+        </tr>
+        <!-- ③ KITTI -->
+        <tr>
+          <td class="idx">03</td>
+          <td class="name">
+            <a href="https://www.cvlibs.net/datasets/kitti/eval_depth.php" target="_blank" rel="noopener">KITTI</a>
+            <span class="src">Driving depth benchmark · KIT</span>
+          </td>
+          <td><span class="pill outdoor">Outdoor</span></td>
+          <td><span class="pill real">Real</span></td>
+          <td><span class="pill dynamic">Dynamic</span></td>
+          <td><div class="mods"><span class="on">R</span><span class="on depth">D</span><span>M</span><span class="on pose">P</span><span class="on k">K</span></div></td>
+          <td>
+            <div class="tasks">
+              <span class="task mono">M-D</span>
+              <span class="task video">V-D</span>
+              <span class="task absent">M-R</span>
+              <span class="task absent">POSE</span>
+            </div>
+          </td>
+          <td class="num">652 <span style="color:var(--muted-2);font-size:10px">· val crop</span></td>
+          <td class="num">30.0</td>
+          <td><span class="path">kitti/</span></td>
+          <td><span class="status ok">available</span></td>
+        </tr>
+        <!-- ④ NYU-v2 -->
+        <tr>
+          <td class="idx">04</td>
+          <td class="name">
+            <a href="https://cs.nyu.edu/~silberman/datasets/nyu_depth_v2.html" target="_blank" rel="noopener">NYU Depth v2</a>
+            <span class="src">Indoor RGB-D · NYU</span>
+          </td>
+          <td><span class="pill indoor">Indoor</span></td>
+          <td><span class="pill real">Real</span></td>
+          <td><span class="pill static">Static</span></td>
+          <td><div class="mods"><span class="on">R</span><span class="on depth">D</span><span>M</span><span>P</span><span class="on k">K</span></div></td>
+          <td>
+            <div class="tasks">
+              <span class="task mono">M-D</span>
+              <span class="task video">V-D</span>
+              <span class="task absent">M-R</span>
+              <span class="task absent">POSE</span>
+            </div>
+          </td>
+          <td class="num">654 <span style="color:var(--muted-2);font-size:10px">· val imgs</span></td>
+          <td class="num">3.0</td>
+          <td><span class="path">nyu_v2/ · nyu/</span></td>
+          <td><span class="status ok">available</span></td>
+        </tr>
+        <!-- ⑤ TUM RGB-D -->
+        <tr>
+          <td class="idx">05</td>
+          <td class="name">
+            <a href="https://cvg.cit.tum.de/data/datasets/rgbd-dataset" target="_blank" rel="noopener">TUM RGB-D</a>
+            <span class="src">Hand-held SLAM benchmark · TUM</span>
+          </td>
+          <td><span class="pill indoor">Indoor</span></td>
+          <td><span class="pill real">Real</span></td>
+          <td><span class="pill dynamic">Dynamic</span></td>
+          <td><div class="mods"><span class="on">R</span><span class="on depth">D</span><span>M</span><span class="on pose">P</span><span class="on k">K</span></div></td>
+          <td>
+            <div class="tasks">
+              <span class="task mono">M-D</span>
+              <span class="task video">V-D</span>
+              <span class="task absent">M-R</span>
+              <span class="task pose">POSE</span>
+            </div>
+          </td>
+          <td class="num">8 <span style="color:var(--muted-2);font-size:10px">· seqs</span></td>
+          <td class="num">5.0</td>
+          <td><span class="path">tum/</span></td>
+          <td><span class="status ok">available</span></td>
+        </tr>
+        <!-- ⑥ 7-Scenes -->
+        <tr>
+          <td class="idx">06</td>
+          <td class="name">
+            <a href="https://www.microsoft.com/en-us/research/project/rgb-d-dataset-7-scenes/" target="_blank" rel="noopener">7-Scenes</a>
+            <span class="src">Indoor relocalisation · Microsoft</span>
+          </td>
+          <td><span class="pill indoor">Indoor</span></td>
+          <td><span class="pill real">Real</span></td>
+          <td><span class="pill static">Static</span></td>
+          <td><div class="mods"><span class="on">R</span><span class="on depth">D</span><span>M</span><span class="on pose">P</span><span class="on k">K</span></div></td>
+          <td>
+            <div class="tasks">
+              <span class="task absent">M-D</span>
+              <span class="task absent">V-D</span>
+              <span class="task recon">M-R</span>
+              <span class="task absent">POSE</span>
+            </div>
+          </td>
+          <td class="num">7 <span style="color:var(--muted-2);font-size:10px">· scenes</span></td>
+          <td class="num">24.0</td>
+          <td><span class="path">7scenes/</span></td>
+          <td><span class="status ok">available</span></td>
+        </tr>
+        <!-- ⑦ Neural RGB-D -->
+        <tr>
+          <td class="idx">07</td>
+          <td class="name">
+            <a href="https://github.com/dazinovic/neural-rgbd-surface-reconstruction" target="_blank" rel="noopener">Neural RGB-D</a>
+            <span class="src">Surface reconstruction benchmark</span>
+          </td>
+          <td><span class="pill indoor">Indoor</span></td>
+          <td><span class="pill real">Real</span></td>
+          <td><span class="pill static">Static</span></td>
+          <td><div class="mods"><span class="on">R</span><span class="on depth">D</span><span>M</span><span class="on pose">P</span><span class="on k">K</span></div></td>
+          <td>
+            <div class="tasks">
+              <span class="task absent">M-D</span>
+              <span class="task absent">V-D</span>
+              <span class="task recon">M-R</span>
+              <span class="task absent">POSE</span>
+            </div>
+          </td>
+          <td class="num">9 <span style="color:var(--muted-2);font-size:10px">· scenes</span></td>
+          <td class="num">7.5</td>
+          <td><span class="path">neural_rgbd/</span></td>
+          <td><span class="status ok">available</span></td>
+        </tr>
+        <!-- ⑧ NEU3D -->
+        <tr>
+          <td class="idx">08</td>
+          <td class="name">
+            <a href="https://github.com/facebookresearch/Neural_3D_Video" target="_blank" rel="noopener">Neural 3D Video</a>
+            <span class="src">Dynamic multi-view rig · Meta</span>
+          </td>
+          <td><span class="pill indoor">Indoor</span></td>
+          <td><span class="pill real">Real</span></td>
+          <td><span class="pill dynamic">Dynamic</span></td>
+          <td><div class="mods"><span class="on">R</span><span>D</span><span>M</span><span class="on pose">P</span><span class="on k">K</span></div></td>
+          <td>
+            <div class="tasks">
+              <span class="task absent">M-D</span>
+              <span class="task absent">V-D</span>
+              <span class="task absent">M-R</span>
+              <span class="task adhoc">AD-HOC</span>
+            </div>
+          </td>
+          <td class="num">1 <span style="color:var(--muted-2);font-size:10px">· scene</span></td>
+          <td class="num">0.4</td>
+          <td><span class="path">neu3d/</span></td>
+          <td><span class="status ok">available</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div style="display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--muted);letter-spacing:0.1em;text-transform:uppercase;padding-top:8px">
+    <span>‡ Disk sizes from /jfs/guibiao/streamVGGT/data/eval</span>
+    <span>Σ ≈ 95 GB total · 8 benchmarks across 4 evaluation tasks</span>
+  </div>
+
+  <!-- Task × Dataset coverage matrix -->
+  <div style="margin-top: 48px; display: grid; grid-template-columns: 200px 1fr; gap: 32px; align-items: start;">
+    <div>
+      <div class="legend-title" style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Coverage</div>
+      <div style="font-family:'Fraunces',serif;font-variation-settings:'opsz' 36,'wght' 500;font-size:20px;letter-spacing:-0.01em;line-height:1.25;color:var(--ink)">
+        Task <em style="color:var(--accent);font-style:italic">×</em> benchmark
+      </div>
+      <p style="font-family:'Newsreader',serif;font-size:13px;line-height:1.5;color:var(--ink-soft);margin-top:10px">
+        Each cell registers whether a benchmark contributes a measurement to that evaluation task.
+        Empty cells mean the benchmark is omitted for that task — either by design (no sequence labels)
+        or by data unavailability.
+      </p>
+    </div>
+
+    <div style="border: 1px solid var(--rule); background: var(--paper-3);">
+      <table class="atlas" style="font-size: 12px;">
+        <thead>
+          <tr>
+            <th>Benchmark</th>
+            <th style="text-align:center; width:90px">Mono-Depth</th>
+            <th style="text-align:center; width:90px">Video-Depth</th>
+            <th style="text-align:center; width:90px">MV-Recon</th>
+            <th style="text-align:center; width:90px">Pose</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="name" style="font-size:14px">MPI Sintel</td>
+            <td class="num" style="text-align:center"><span class="check">✓</span></td>
+            <td class="num" style="text-align:center"><span class="check">✓</span></td>
+            <td class="num" style="text-align:center"><span class="em-dash">·</span></td>
+            <td class="num" style="text-align:center"><span class="check">✓</span></td>
+          </tr>
+          <tr>
+            <td class="name" style="font-size:14px">Bonn RGB-D</td>
+            <td class="num" style="text-align:center"><span class="check">✓</span></td>
+            <td class="num" style="text-align:center"><span class="check">✓</span></td>
+            <td class="num" style="text-align:center"><span class="em-dash">·</span></td>
+            <td class="num" style="text-align:center"><span class="check">✓</span></td>
+          </tr>
+          <tr>
+            <td class="name" style="font-size:14px">KITTI</td>
+            <td class="num" style="text-align:center"><span class="check">✓</span></td>
+            <td class="num" style="text-align:center"><span class="check">✓</span></td>
+            <td class="num" style="text-align:center"><span class="em-dash">·</span></td>
+            <td class="num" style="text-align:center"><span class="em-dash">·</span></td>
+          </tr>
+          <tr>
+            <td class="name" style="font-size:14px">NYU Depth v2</td>
+            <td class="num" style="text-align:center"><span class="check">✓</span></td>
+            <td class="num" style="text-align:center"><span class="check">✓</span></td>
+            <td class="num" style="text-align:center"><span class="em-dash">·</span></td>
+            <td class="num" style="text-align:center"><span class="em-dash">·</span></td>
+          </tr>
+          <tr>
+            <td class="name" style="font-size:14px">TUM RGB-D</td>
+            <td class="num" style="text-align:center"><span class="check">✓</span></td>
+            <td class="num" style="text-align:center"><span class="check">✓</span></td>
+            <td class="num" style="text-align:center"><span class="em-dash">·</span></td>
+            <td class="num" style="text-align:center"><span class="check">✓</span></td>
+          </tr>
+          <tr>
+            <td class="name" style="font-size:14px">7-Scenes</td>
+            <td class="num" style="text-align:center"><span class="em-dash">·</span></td>
+            <td class="num" style="text-align:center"><span class="em-dash">·</span></td>
+            <td class="num" style="text-align:center"><span class="check">✓</span></td>
+            <td class="num" style="text-align:center"><span class="em-dash">·</span></td>
+          </tr>
+          <tr>
+            <td class="name" style="font-size:14px">Neural RGB-D</td>
+            <td class="num" style="text-align:center"><span class="em-dash">·</span></td>
+            <td class="num" style="text-align:center"><span class="em-dash">·</span></td>
+            <td class="num" style="text-align:center"><span class="check">✓</span></td>
+            <td class="num" style="text-align:center"><span class="em-dash">·</span></td>
+          </tr>
+          <tr>
+            <td class="name" style="font-size:14px">Neural 3D Video</td>
+            <td class="num" style="text-align:center"><span class="em-dash">·</span></td>
+            <td class="num" style="text-align:center"><span class="em-dash">·</span></td>
+            <td class="num" style="text-align:center"><span class="em-dash">·</span></td>
+            <td class="num" style="text-align:center"><span style="color:var(--plum); font-weight:600;">~</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="ornament">· · ·</div>
+
+  <!-- ════ CUSTOM DATASET REGISTRATION ═══════════════════════════ -->
+  <div class="sec-head">
+    <div class="sec-num">§ 04</div>
+    <h2>Registering a <em>custom</em> dataset</h2>
+    <div class="meta">Five steps · BaseMultiViewDataset → __init__.py → train.yaml</div>
+  </div>
+
+  <p style="font-size:16px;color:var(--ink-soft);max-width:880px;margin:0 0 36px;">
+    Adding a new dataset is mechanically simple — subclass <strong>BaseMultiViewDataset</strong>,
+    implement two methods, register an import, and add two lines to the YAML. The
+    interesting work is in the data contract: every dataset, no matter how it
+    looks on disk, must return a <strong>list of view dicts</strong> with the same keys, the
+    same dtypes, and the same coordinate conventions. Get that right and the
+    training loop never knows your loader is new.
+  </p>
+
+  <div class="recipe">
+
+    <!-- ⓵ subclass -->
+    <div class="recipe-step">
+      <div class="recipe-num">1</div>
+      <div class="recipe-body">
+        <h3>Create the loader file · subclass <em>BaseMultiViewDataset</em></h3>
+        <p>Place a new module at <code style="font-family:'JetBrains Mono',monospace;font-size:12.5px;color:var(--accent);background:var(--paper-3);padding:1px 5px;border:1px solid var(--rule)">src/dust3r/datasets/&lt;your_name&gt;.py</code>.
+        The base class lives at <code style="font-family:'JetBrains Mono',monospace;font-size:12.5px;color:var(--accent);background:var(--paper-3);padding:1px 5px;border:1px solid var(--rule)">src/dust3r/datasets/base/base_multiview_dataset.py:26</code>
+        and gives you the sampler, the resolution machinery, the
+        crop / colour-jitter pipeline, and the timestamp-based view sampling.
+        Your job is exactly two methods: <strong>_load_data</strong> (index the on-disk tree once
+        at construction) and <strong>_get_views</strong> (materialise <em>num_views</em> frames for a sample).</p>
+
+        <div class="code">
+          <div class="code-bar"><span>src/dust3r/datasets/my_lab_scans.py</span><span>python</span></div>
+<pre><span class="com"># skeleton for a new multi-view dataset loader</span>
+<span class="kw">import</span> os, os.path <span class="kw">as</span> osp
+<span class="kw">import</span> cv2, numpy <span class="kw">as</span> np
+
+<span class="kw">from</span> dust3r.datasets.base.base_multiview_dataset <span class="kw">import</span> BaseMultiViewDataset
+<span class="kw">from</span> dust3r.utils.image <span class="kw">import</span> imread_cv2
+
+
+<span class="kw">class</span> <span class="cls">MyLabScans_Multi</span>(<span class="cls">BaseMultiViewDataset</span>):
+    <span class="kw">def</span> <span class="fn">__init__</span>(<span class="self">self</span>, <span class="var">*args</span>, split, ROOT, <span class="var">**kwargs</span>):
+        <span class="self">self</span>.ROOT       = ROOT
+        <span class="self">self</span>.split      = split
+        <span class="self">self</span>.video      = <span class="num">True</span>         <span class="com"># sequence-style (vs. random-pair)</span>
+        <span class="self">self</span>.is_metric  = <span class="num">True</span>         <span class="com"># False if depth is up-to-scale only</span>
+        <span class="self">self</span>.max_interval = <span class="num">8</span>          <span class="com"># sampler stride within sequence</span>
+
+        <span class="fn">super</span>().<span class="fn">__init__</span>(<span class="var">*args</span>, <span class="var">**kwargs</span>)     <span class="com"># resolves resolution, transform, etc.</span>
+        <span class="self">self</span>.loaded_data = <span class="self">self</span>.<span class="fn">_load_data</span>()</pre>
+        </div>
+
+        <div class="callout note">
+          <strong>Naming convention</strong>
+          The suffix <code>_Multi</code> is conventional for the streaming
+          multi-view variant. The 15 production loaders (Co3d_Multi, ScanNet_Multi,
+          …) all follow it — Hydra will <code>eval()</code> whatever string you put in
+          the YAML, so the class name and the YAML reference must match exactly.
+        </div>
+      </div>
+    </div>
+
+    <!-- ⓶ _load_data -->
+    <div class="recipe-step">
+      <div class="recipe-num">2</div>
+      <div class="recipe-body">
+        <h3>Index the on-disk tree · implement <em>_load_data</em></h3>
+        <p>Called once per epoch construction on rank 0 (or every rank, depending
+        on launcher mode). Its job is to populate <strong>five arrays</strong> the base sampler
+        relies on. Walk through every scene once, decide which contiguous chunks
+        of frames are valid sequence starts, and stash the answers.</p>
+
+        <table class="schema">
+          <thead>
+            <tr>
+              <th style="width: 22%">Attribute</th>
+              <th style="width: 14%">Type</th>
+              <th>Purpose</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td class="field">self.scenes</td>            <td class="ty">List[str]</td>     <td class="desc">Stable scene identifiers (subdir names). Indexed by <code>sceneids</code>.</td></tr>
+            <tr><td class="field">self.sceneids</td>          <td class="ty">List[int]</td>     <td class="desc">Per-image scene-index back-pointer · <code>len == total_images</code>.</td></tr>
+            <tr><td class="field">self.images</td>            <td class="ty">List[str]</td>     <td class="desc">Per-image relative path (joined with <code>ROOT/scenes[sceneids[i]]</code> at read time).</td></tr>
+            <tr><td class="field">self.scene_img_list</td>    <td class="ty">List[List[int]]</td> <td class="desc">Per-scene ordered list of <em>global</em> image indices. Used by the sequence sampler.</td></tr>
+            <tr><td class="field">self.start_img_ids</td>     <td class="ty">List[int]</td>     <td class="desc">Valid sequence-start indices, i.e. positions <em>i</em> where <code>[i, i+stride…]</code> can yield <code>num_views</code> frames.</td></tr>
+          </tbody>
+        </table>
+
+        <div class="callout tip">
+          <strong>Why so many arrays?</strong>
+          The flat <code>images</code> / <code>sceneids</code> form is what the
+          batched random sampler iterates over; the <code>scene_img_list</code> /
+          <code>start_img_ids</code> form is what the sequence sampler uses to pick
+          temporally contiguous frames. Keeping both lets the same loader feed
+          either sampling regime.
+        </div>
+      </div>
+    </div>
+
+    <!-- ⓷ _get_views -->
+    <div class="recipe-step">
+      <div class="recipe-num">3</div>
+      <div class="recipe-body">
+        <h3>Materialise samples · implement <em>_get_views</em></h3>
+        <p>Returns a list of <strong>exactly <em>num_views</em> dicts</strong>, one per frame in the
+        sample. Decode RGB, decode depth, load intrinsics &amp; pose, crop &amp;
+        resize to the chosen resolution, then assemble the contract dict.</p>
+
+        <div class="code">
+          <div class="code-bar"><span>my_lab_scans.py · _get_views</span><span>python</span></div>
+<pre>    <span class="kw">def</span> <span class="fn">_get_views</span>(<span class="self">self</span>, idx, resolution, rng, num_views):
+        start_id = <span class="self">self</span>.start_img_ids[idx <span class="kw">//</span> <span class="num">10</span>]   <span class="com"># × 10 ≡ re-use start over epoch</span>
+        scene_id = <span class="self">self</span>.sceneids[start_id]
+        all_ids  = <span class="self">self</span>.scene_img_list[scene_id]
+
+        pos, ordered_video = <span class="self">self</span>.<span class="fn">get_seq_from_start_id</span>(
+            num_views, start_id, all_ids, rng,
+            max_interval=<span class="self">self</span>.max_interval, block_shuffle=<span class="num">16</span>,
+        )
+        image_idxs = np.<span class="fn">array</span>(all_ids)[pos]
+
+        views = []
+        <span class="kw">for</span> v, view_idx <span class="kw">in</span> <span class="fn">enumerate</span>(image_idxs):
+            scene_dir = osp.<span class="fn">join</span>(<span class="self">self</span>.ROOT, <span class="self">self</span>.scenes[<span class="self">self</span>.sceneids[view_idx]])
+            rgb_path  = <span class="self">self</span>.images[view_idx]
+
+            rgb       = <span class="fn">imread_cv2</span>(osp.<span class="fn">join</span>(scene_dir, rgb_path), cv2.IMREAD_COLOR)
+            depth     = np.<span class="fn">load</span>(osp.<span class="fn">join</span>(scene_dir, rgb_path.<span class="fn">replace</span>(<span class="str">"rgb.png"</span>, <span class="str">"depth.npy"</span>)))
+            depth[~np.<span class="fn">isfinite</span>(depth)] = <span class="num">0</span>
+            cam       = np.<span class="fn">load</span>(osp.<span class="fn">join</span>(scene_dir, rgb_path.<span class="fn">replace</span>(<span class="str">"rgb.png"</span>, <span class="str">"cam.npz"</span>)))
+            K, pose   = cam[<span class="str">"intrinsics"</span>].<span class="fn">astype</span>(np.float32), cam[<span class="str">"pose"</span>].<span class="fn">astype</span>(np.float32)
+
+            rgb, depth, K = <span class="self">self</span>.<span class="fn">_crop_resize_if_necessary</span>(
+                rgb, depth, K, resolution, rng=rng, info=view_idx)
+
+            img_mask, ray_mask = <span class="self">self</span>.<span class="fn">get_img_and_ray_masks</span>(
+                <span class="self">self</span>.is_metric, v, rng, p=[<span class="num">0.75</span>, <span class="num">0.2</span>, <span class="num">0.05</span>])
+
+            views.<span class="fn">append</span>(<span class="fn">dict</span>(
+                img=rgb, depthmap=depth.<span class="fn">astype</span>(np.float32),
+                camera_pose=pose, camera_intrinsics=K,
+                dataset=<span class="str">"my_lab_scans"</span>,                <span class="com"># ← short stable id</span>
+                label=<span class="self">self</span>.scenes[scene_id] + <span class="str">"_"</span> + rgb_path,
+                instance=<span class="fn">f</span><span class="str">"{idx}_{view_idx}"</span>,
+                is_metric=<span class="self">self</span>.is_metric,
+                is_video=ordered_video,
+                quantile=np.<span class="fn">array</span>(<span class="num">1.0</span>, dtype=np.float32),
+                img_mask=img_mask, ray_mask=ray_mask,
+                camera_only=<span class="num">False</span>, depth_only=<span class="num">False</span>,
+                single_view=<span class="num">False</span>, reset=<span class="num">False</span>,
+            ))
+        <span class="kw">assert</span> <span class="fn">len</span>(views) == num_views
+        <span class="kw">return</span> views</pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- ⓸ contract -->
+    <div class="recipe-step">
+      <div class="recipe-num">4</div>
+      <div class="recipe-body">
+        <h3>Honour the <em>view dict contract</em></h3>
+        <p>Every dict your loader appends must contain these keys, exactly named,
+        with the dtypes shown. Missing or mis-typed keys surface as opaque
+        <code>KeyError</code> / dtype mismatches deep inside the loss code — fix here, not there.</p>
+
+        <table class="schema">
+          <thead>
+            <tr>
+              <th style="width: 16%">Key</th>
+              <th style="width: 16%">Type / shape</th>
+              <th style="width: 12%">Required?</th>
+              <th>Convention</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td class="field">img</td>                <td class="ty">uint8 · H×W×3 BGR</td>     <td><span class="req must">must</span></td>      <td class="desc">OpenCV BGR layout. Base-class transform converts to tensor &amp; normalises.</td></tr>
+            <tr><td class="field">depthmap</td>           <td class="ty">float32 · H×W</td>         <td><span class="req must">must</span></td>      <td class="desc">Metric depth in metres, or relative depth if <code>is_metric=False</code>. <code>0</code> marks invalid.</td></tr>
+            <tr><td class="field">camera_pose</td>        <td class="ty">float32 · 4×4</td>         <td><span class="req must">must</span></td>      <td class="desc">camera-to-world (OpenCV / right-handed +X right, +Y down, +Z forward).</td></tr>
+            <tr><td class="field">camera_intrinsics</td>  <td class="ty">float32 · 3×3</td>         <td><span class="req must">must</span></td>      <td class="desc">After the crop &amp; resize — call <code>_crop_resize_if_necessary</code> so K matches the final image.</td></tr>
+            <tr><td class="field">dataset</td>            <td class="ty">str</td>                  <td><span class="req must">must</span></td>      <td class="desc">Short stable id used for per-dataset metric reporting. <em>e.g.</em> <code>"my_lab_scans"</code>.</td></tr>
+            <tr><td class="field">label</td>              <td class="ty">str</td>                  <td><span class="req recommend">should</span></td><td class="desc">Human-readable identifier — usually <code>scene/frame</code>. Surfaces in TensorBoard image titles.</td></tr>
+            <tr><td class="field">instance</td>           <td class="ty">str</td>                  <td><span class="req recommend">should</span></td><td class="desc">Unique within an epoch. Convention: <code>f"{idx}_{view_idx}"</code>.</td></tr>
+            <tr><td class="field">is_metric</td>          <td class="ty">bool</td>                 <td><span class="req must">must</span></td>      <td class="desc">Drives whether the loss aligns scale-shift before comparison.</td></tr>
+            <tr><td class="field">is_video</td>           <td class="ty">bool</td>                 <td><span class="req must">must</span></td>      <td class="desc"><code>True</code> if frames are temporally ordered; controls the streaming attention mask.</td></tr>
+            <tr><td class="field">quantile</td>           <td class="ty">float32 · scalar</td>     <td><span class="req must">must</span></td>      <td class="desc">Depth-clip quantile for outlier robustness. <code>1.0</code> = no clipping.</td></tr>
+            <tr><td class="field">img_mask</td>           <td class="ty">bool · H×W</td>           <td><span class="req must">must</span></td>      <td class="desc">Image-validity (sky, transparent). <code>get_img_and_ray_masks</code> handles defaults.</td></tr>
+            <tr><td class="field">ray_mask</td>           <td class="ty">bool · H×W</td>           <td><span class="req must">must</span></td>      <td class="desc">Per-ray supervision mask (depth-validity ∩ image-validity).</td></tr>
+            <tr><td class="field">camera_only</td>        <td class="ty">bool</td>                 <td><span class="req must">must</span></td>      <td class="desc"><code>True</code> for pose-only sources (e.g. RealEstate10K) — disables depth loss.</td></tr>
+            <tr><td class="field">depth_only</td>         <td class="ty">bool</td>                 <td><span class="req must">must</span></td>      <td class="desc"><code>True</code> for single-view depth corpora — disables pose loss.</td></tr>
+            <tr><td class="field">single_view</td>        <td class="ty">bool</td>                 <td><span class="req must">must</span></td>      <td class="desc"><code>True</code> if the source has no multi-view links across frames.</td></tr>
+            <tr><td class="field">reset</td>              <td class="ty">bool</td>                 <td><span class="req must">must</span></td>      <td class="desc">Streaming-state reset flag for the first frame of a new sequence.</td></tr>
+          </tbody>
+        </table>
+
+        <div class="callout warn">
+          <strong>The four silent footguns</strong>
+          ① <strong>Coordinate frame</strong>: pose must be <em>camera-to-world</em>; many SfM exports give world-to-camera. Apply <code>np.linalg.inv</code> if needed.<br>
+          ② <strong>Depth zero-handling</strong>: any non-finite or negative depth pixel must become <code>0</code> before assembly; downstream code interprets <code>0</code> as "invalid", not "very close".<br>
+          ③ <strong>Intrinsics after resize</strong>: <code>K</code> must reflect the final image dimensions — always call <code>_crop_resize_if_necessary</code> instead of resizing manually.<br>
+          ④ <strong>Length invariant</strong>: <code>len(views) == num_views</code> is asserted in the base. If your sampler returns fewer frames, the run crashes at the first iter, not at construction.
+        </div>
+      </div>
+    </div>
+
+    <!-- ⓹ register -->
+    <div class="recipe-step">
+      <div class="recipe-num">5</div>
+      <div class="recipe-body">
+        <h3>Wire it in · two files, four lines</h3>
+        <p>Once the loader works in isolation, two registrations make it visible to the
+        Hydra config: import in the dataset module's <strong>__init__.py</strong>, then reference by
+        constructor-call string in <strong>config/train.yaml</strong>.</p>
+
+        <div class="code">
+          <div class="code-bar"><span>src/dust3r/datasets/__init__.py</span><span>+1 line</span></div>
+<pre><span class="kw">from</span> .wildrgbd <span class="kw">import</span> WildRGBD_Multi
+<span class="kw">from</span> <span class="var">.my_lab_scans</span> <span class="kw">import</span> <span class="var">MyLabScans_Multi</span>      <span class="com"># ← add this line</span></pre>
+        </div>
+
+        <div class="code">
+          <div class="code-bar"><span>config/train.yaml</span><span>+1 dataset block, +1 mixture term</span></div>
+<pre><span class="com"># 1) Define the dataset block alongside the other 15:</span>
+<span class="var">dataset16</span>: <span class="fn">MyLabScans_Multi</span>(allow_repeat=${allow_repeat}, split=<span class="str">'train'</span>,
+  ROOT=<span class="str">"../data/train/my_lab_scans"</span>,
+  aug_crop=<span class="num">16</span>,
+  resolution=[(<span class="num">518</span>, <span class="num">392</span>), (<span class="num">518</span>, <span class="num">336</span>), (<span class="num">518</span>, <span class="num">294</span>), (<span class="num">518</span>, <span class="num">266</span>),
+              (<span class="num">518</span>, <span class="num">210</span>), (<span class="num">518</span>, <span class="num">154</span>), (<span class="num">392</span>, <span class="num">518</span>), (<span class="num">336</span>, <span class="num">518</span>),
+              (<span class="num">294</span>, <span class="num">518</span>), (<span class="num">266</span>, <span class="num">518</span>)],
+  transform=SeqColorJitter, num_views=${num_views}, n_corres=${n_corres_train})
+
+<span class="com"># 2) Add to the mixture concat with a sample weight:</span>
+<span class="var">train_dataset</span>: <span class="num">4500</span> @ ${dataset1} + <span class="num">4500</span> @ ${dataset2} + <span class="var">...</span>
+              + <span class="num">2250</span> @ ${dataset15}
+              + <span class="num">1500</span> @ ${<span class="var">dataset16</span>}                <span class="com"># ← your weight here</span></pre>
+        </div>
+
+        <div class="callout note">
+          <strong>Choosing a sample weight</strong>
+          The integer is samples drawn per epoch, not a probability. Anchor it against
+          dataset size and signal quality — if your set has 200 scenes of clean
+          metric depth, <code>1500</code> is reasonable; for 50 scenes of noisy MVS,
+          maybe <code>400</code>. The current mixture floor is MVS-Synth at <code>450</code>; the
+          ceiling is CO3D/ScanNet/ARKit at <code>4500</code>.
+        </div>
+      </div>
+    </div>
+
+    <!-- ⓺ verify -->
+    <div class="recipe-step">
+      <div class="recipe-num">6</div>
+      <div class="recipe-body">
+        <h3>Smoke-test before going wide</h3>
+        <p>Drive your loader once in isolation before launching distributed training.
+        A 30-second Python session catches schema bugs that would otherwise stall
+        a 32-GPU job at iteration zero.</p>
+
+        <div class="code">
+          <div class="code-bar"><span>standalone sanity check · run from src/</span><span>python -i</span></div>
+<pre><span class="kw">from</span> dust3r.datasets <span class="kw">import</span> MyLabScans_Multi
+
+ds = <span class="fn">MyLabScans_Multi</span>(
+    split=<span class="str">"train"</span>, ROOT=<span class="str">"../data/train/my_lab_scans"</span>,
+    num_views=<span class="num">10</span>, resolution=[(<span class="num">518</span>, <span class="num">392</span>)],
+    aug_crop=<span class="num">16</span>, transform=<span class="str">"SeqColorJitter"</span>,
+)
+<span class="fn">print</span>(<span class="fn">len</span>(ds), <span class="str">"samples ·"</span>, <span class="fn">len</span>(ds.scenes), <span class="str">"scenes"</span>)
+sample = ds[<span class="num">0</span>]                       <span class="com"># list of 10 view dicts</span>
+v0 = sample[<span class="num">0</span>]
+<span class="kw">assert</span> v0[<span class="str">"img"</span>].shape[<span class="num">2</span>] == <span class="num">3</span>          <span class="com"># BGR</span>
+<span class="kw">assert</span> v0[<span class="str">"depthmap"</span>].dtype == np.float32
+<span class="kw">assert</span> v0[<span class="str">"camera_pose"</span>].shape == (<span class="num">4</span>, <span class="num">4</span>)
+<span class="kw">assert</span> v0[<span class="str">"camera_intrinsics"</span>].shape == (<span class="num">3</span>, <span class="num">3</span>)
+<span class="fn">print</span>(<span class="str">"✓ schema OK · is_metric ="</span>, v0[<span class="str">"is_metric"</span>])</pre>
+        </div>
+
+        <div class="callout tip">
+          <strong>Then a 1-GPU dry-run</strong>
+          With everything wired, run the full launcher on a single GPU and
+          <code>--num_processes 1</code> for one print-cycle. If you see the first
+          loss line without an exception, you're safe to scale out.
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="ornament">· · ·</div>
+
+  <!-- ════ NOTES ═════════════════════════════════════════════════ -->
+  <div class="sec-head">
+    <div class="sec-num">§ 05</div>
+    <h2>Field <em>notes</em> &amp; methodology</h2>
+    <div class="meta">Read before launching ./train.py or ./eval/*/run.sh</div>
+  </div>
+
+  <div class="notes">
+    <p><strong>On the schema.</strong> Every preprocessed frame becomes a tuple of
+    <code>{ .jpg, .png, _mask.png, .npz }</code> — RGB, depth as uint16 scaled to
+    <code>maximum_depth</code>, valid mask, and a metadata NPZ holding
+    <code>camera_intrinsics</code>, <code>camera_pose</code>, and the depth scale.
+    Each loader in <code>src/dust3r/datasets/</code> knows its own minor variation
+    (Hypersim flat <code>_rgb/_depth/_cam</code>, ScanNet's tri-folder
+    <code>color/depth/cam</code>, BlendedMVS using <code>.exr</code>+<code>.safetensor</code>).</p>
+
+    <p><strong>On the mixture weight.</strong> <code>config/train.yaml:63–65</code>
+    composes the train set as <code>N @ datasetX</code>. The integer is the number
+    of samples drawn per epoch — not a probability — so adding more datasets
+    grows the epoch linearly. The <em>Share</em> column above is <code>N / 38,750</code>.</p>
+
+    <p><strong>On per-sample geometry.</strong> Each <code>__getitem__</code> returns
+    <code>num_views = 10</code> temporally / spatially adjacent frames at one of ten
+    aspect ratios (long side fixed at 518). The student is asked to reconstruct all
+    ten views jointly; the frozen VGGT-1B teacher provides the supervision target via
+    <code>DistillLoss</code>.</p>
+
+    <p><strong>On metric scale.</strong> Datasets marked <span style="color:var(--muted-2)">— (rel.)</span>
+    only have <em>relative</em> depth (SfM landmark sparsity or
+    arbitrary-scale MVS). They still contribute through the distillation signal because
+    the teacher's prediction provides a consistent reference frame across the mixture.</p>
+
+    <p><strong>On data layout.</strong> The expected on-disk root is
+    <code>data/train/&lt;name&gt;/</code> matching the <code>Path</code> column.
+    On this cluster, the cleanest wiring is a symlink farm pointing
+    <code>data/train/processed_co3d → /jfs/Data_4DFF/train_data/co3d</code> (and so on
+    for the other thirteen). Two slots — ARKitScenes-HR and ScanNet++ — need either
+    new downloads or removal from the mixture line.</p>
+
+    <p><strong>On the missing 12 %.</strong> ARKitScenes-HR (5.81 %) and ScanNet++
+    (5.81 %) together account for ≈11.6 % of the mixture. Training without them
+    is feasible — expect a modest dip on high-frequency indoor reconstruction
+    benchmarks (NYU-v2, 7-Scenes). Either fetch later or comment them out of
+    <code>train_dataset:</code>.</p>
+
+    <p><strong>On BlendedMVS.</strong> The on-disk copy uses
+    <code>.safetensor</code> per-frame instead of the older <code>.npz</code> CUT3R
+    schema. This is a recent revision — verify <code>src/dust3r/datasets/blendedmvs.py</code>
+    parses it before assuming the loader works.</p>
+
+    <p><strong>On disk discipline.</strong> Total raw download is ≈25 TB across the
+    fifteen sources. The processed CUT3R version is meaningfully smaller (≈12–15 TB).
+    Per-frame IO dominates wall time, not GPU compute — bump
+    <code>num_workers</code> above 12 if your filesystem can sustain it.</p>
+
+    <p><strong>On evaluation tasks.</strong> Four task families live under
+    <code>src/eval/</code> — monocular depth (<code>monodepth/</code>), video depth
+    (<code>video_depth/</code>), multi-view reconstruction (<code>mv_recon/</code>)
+    and camera-pose / trajectory (<code>pose_evaluation/</code>). The per-task
+    dataset registry is defined in each subfolder's <code>metadata.py</code>; cross
+    them against the coverage matrix above before invoking
+    <code>./eval/&lt;task&gt;/run.sh</code>.</p>
+
+    <p><strong>On eval data wiring.</strong> Eval roots are hard-coded relative to
+    <code>../data/eval/</code> in <code>src/eval/*/metadata.py</code>. Mirror the
+    layout from <code>/jfs/guibiao/streamVGGT/data/eval</code> exactly — names are
+    case-sensitive and code expects e.g.
+    <code>data/eval/kitti/depth_selection/val_selection_cropped/image_gathered/</code>
+    for KITTI, <code>data/eval/sintel/training/{final,camdata_left}/</code> for
+    Sintel, and <code>data/eval/bonn/rgbd_bonn_dataset/rgbd_bonn_&lt;seq&gt;/rgb_110/</code>
+    for Bonn's 110-Hz crop.</p>
+
+    <p><strong>On Neural 3D Video.</strong> Present on disk (single scene,
+    <code>cut_roasted_beef</code>) but not wired into any <code>run.sh</code>. Listed
+    here as an <em>ad-hoc</em> resource — useful for qualitative dynamic-scene
+    demos, not part of the reported benchmark suite.</p>
+
+    <p><strong>On metric conventions.</strong> Mono- and Video-Depth report
+    <code>AbsRel</code>, <code>δ&lt;1.25</code> after scale-shift alignment for
+    relative-depth datasets and unaligned for metric ones. MV-Recon reports
+    Chamfer distance, accuracy and completion on the unified point cloud.
+    Pose reports ATE-RMSE and RPE in TUM trajectory format
+    (see <code>traj_format: "tum"</code> in the metadata files).</p>
+  </div>
+
+  <!-- ════ FOOTER ════════════════════════════════════════════════ -->
+  <footer>
+    <div class="mark">Stream<em>VGGT</em> · data atlas</div>
+    <div>config/train.yaml · §dataset1 – §dataset15</div>
+    <div>Sources: CUT3R · DUSt3R · MonST3R</div>
+  </footer>
+
+</div>
+
+<script>
+  // ─── Build mixture bar from table data ───
+  (function () {
+    const weights = [
+      { n: 'CO3Dv2',            w: 4500, c: 'var(--t-object)' },
+      { n: 'WildRGB-D',         w: 4500, c: 'var(--t-object)' },
+      { n: 'ARKitScenes',       w: 4500, c: 'var(--t-indoor)' },
+      { n: 'ARKitScenes-HR',    w: 2250, c: 'var(--t-indoor)' },
+      { n: 'ScanNet++',         w: 2250, c: 'var(--t-indoor)' },
+      { n: 'ScanNet',           w: 4500, c: 'var(--t-indoor)' },
+      { n: 'Hypersim',          w: 1200, c: 'var(--t-synth)' },
+      { n: 'BlendedMVS',        w: 2250, c: 'var(--t-mixed)' },
+      { n: 'MegaDepth',         w: 2250, c: 'var(--t-outdoor)' },
+      { n: 'Waymo',             w: 2250, c: 'var(--t-outdoor)' },
+      { n: 'Virtual KITTI 2',   w: 2250, c: 'var(--t-outdoor)' },
+      { n: 'OmniObject3D',      w: 1800, c: 'var(--t-object)' },
+      { n: 'Spring',            w: 1800, c: 'var(--t-mixed)' },
+      { n: 'MVS-Synth',         w:  450, c: 'var(--t-outdoor)' },
+      { n: 'PointOdyssey',      w: 2250, c: 'var(--t-mixed)' },
+    ];
+    const total = weights.reduce((s, x) => s + x.w, 0);
+    const bar = document.getElementById('mixbar');
+    weights.forEach((d, i) => {
+      const cell = document.createElement('div');
+      cell.className = 'mix-cell';
+      cell.style.width = (d.w / total * 100) + '%';
+      cell.style.background = d.c;
+      const pct = (d.w / total * 100).toFixed(2);
+      cell.dataset.label = `${d.n} · ${d.w.toLocaleString()} · ${pct}%`;
+      cell.setAttribute('title', cell.dataset.label);
+      cell.style.animationDelay = (0.8 + i * 0.04) + 's';
+      bar.appendChild(cell);
+    });
+  })();
+</script>
+</body>
+</html>
