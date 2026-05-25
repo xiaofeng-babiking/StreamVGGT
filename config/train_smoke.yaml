@@ -1,0 +1,64 @@
+# Smoke variant of train.yaml — runs ~20 steps on a tiny subset for L4 testing.
+# Mirrors config/train.yaml with overrides for fast iteration.
+
+teacher: ../ckpt/model.pt
+pretrained: ../ckpt/model.pt
+load_only_encoder: False
+long_context: False
+fixed_length: True
+resume: Null
+benchmark: False
+num_views: 4
+num_test_views: 2
+n_corres_train: 0
+n_corres_test: 0
+
+train_criterion: DistillLoss()
+test_criterion: DistillLoss()
+allow_repeat: False
+
+dataset1: Co3d_Multi(allow_repeat=${allow_repeat}, split='train', ROOT='../data/train/processed_co3d/',
+  aug_crop=16, resolution=[(518, 392)],
+  transform=SeqColorJitter, num_views=${num_views}, n_corres=${n_corres_train})
+
+train_dataset: 100 @ ${dataset1}
+test_dataset: 20 @ ARKitScenes_Multi(split='test', ROOT='../data/train/processed_arkitscenes/', resolution=(518, 392), num_views=${num_test_views}, seed=42, n_corres=${n_corres_test})
+
+seed: 0
+batch_size: 1
+accum_iter: 1
+gradient_checkpointing: False
+epochs: 1
+start_epoch: 0
+start_step: 0
+weight_decay: 0.05
+lr: 1e-5
+min_lr: 1e-7
+warmup_epochs: 0
+amp: 1
+
+num_workers: 2
+world_size: 1
+local-rank: -1
+dist_url: 'env://'
+rank: 0
+gpu: 0
+distributed: False
+dist_backend: 'nccl'
+
+eval_freq: 1
+save_freq: 1.0
+max_checkpoints: 2
+keep_freq: 1
+print_freq: 5
+print_img_freq: 50000000
+num_imgs_vis: 4
+save_dir: '../checkpoints'
+exp_name: 'StreamVGGT_smoke'
+task: 'StreamVGGT_smoke'
+logdir: ${save_dir}/${exp_name}/logs
+output_dir: ${save_dir}/${exp_name}/
+hydra:
+  verbose: True
+  run:
+    dir: ${save_dir}/${exp_name}
