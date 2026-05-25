@@ -64,8 +64,9 @@ def tail(ctx: click.Context, job_id: str) -> None:
 @click.pass_context
 def monitor(ctx: click.Context, job_id: str) -> None:
     """Live TUI dashboard of GPU and IB stats."""
-    click.echo(f"monitor {job_id}: not implemented yet", err=True)
-    ctx.exit(2)
+    from svggt_orch.monitor import run_monitor
+    code = run_monitor(ctx.obj["config_path"], job_id)
+    ctx.exit(code)
 
 
 @main.command()
