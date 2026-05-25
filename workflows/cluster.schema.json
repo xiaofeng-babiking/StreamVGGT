@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "cluster.yaml",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["ssh", "candidate_hosts", "docker", "paths", "nccl"],
+  "properties": {
+    "ssh": {
+      "type": "object",
+      "required": ["user", "identity_file"],
+      "additionalProperties": false,
+      "properties": {
+        "user": {"type": "string"},
+        "identity_file": {"type": "string"},
+        "connect_timeout_s": {"type": "integer", "minimum": 1}
+      }
+    },
+    "candidate_hosts": {
+      "type": "array",
+      "items": {"type": "string"},
+      "minItems": 1
+    },
+    "docker": {
+      "type": "object",
+      "required": ["image"],
+      "additionalProperties": false,
+      "properties": {
+        "image": {"type": "string"},
+        "shm_size": {"type": "string"}
+      }
+    },
+    "paths": {
+      "type": "object",
+      "required": ["repo", "venv", "jfs"],
+      "additionalProperties": false,
+      "properties": {
+        "repo": {"type": "string"},
+        "venv": {"type": "string"},
+        "jfs": {"type": "string"}
+      }
+    },
+    "discovery": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "idle_threshold_mib": {"type": "integer", "minimum": 0},
+        "min_idle_gpus_per_node": {"type": "integer", "minimum": 1}
+      }
+    },
+    "nccl": {
+      "type": "object",
+      "required": ["ib_hca", "socket_ifname"],
+      "additionalProperties": false,
+      "properties": {
+        "ib_hca": {"type": "string"},
+        "socket_ifname": {"type": "string"},
+        "ib_disable": {"type": "integer", "enum": [0, 1]},
+        "async_error_handling": {"type": "integer", "enum": [0, 1]},
+        "debug": {"type": "string", "enum": ["VERSION", "WARN", "INFO", "TRACE"]},
+        "ib_timeout": {"type": "integer", "minimum": 1},
+        "net_gdr_level": {"type": "string"}
+      }
+    },
+    "train": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "entrypoint": {"type": "string"},
+        "config_name": {"type": "string"},
+        "main_port": {"type": "integer", "minimum": 1024, "maximum": 65535}
+      }
+    }
+  }
+}
