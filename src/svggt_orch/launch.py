@@ -246,3 +246,95 @@ def run_launch(cfg_path: Path, dry_run: bool, exp_name: "str | None") -> int:
         return 0
 
     return asyncio.run(_go())
+
+
+async def _docker_ps_one(
+    host: str, container: str, cfg: "ClusterConfig"
+) -> "tuple[str, str]":
+    import asyncssh  # lazy
+
+    try:
+        async with asyncssh.connect(
+            host,
+            username=cfg.ssh.user,
+            client_keys=[str(Path(cfg.ssh.identity_file).expanduser())],
+            known_hosts=None,
+            connect_timeout=cfg.ssh.connect_timeout_s,
+        ) as conn:
+            r = await conn.run(
+                f"docker inspect -f '{{{{.State.Status}}}} {{{{.State.ExitCode}}}}' {container}",
+                check=False,
+                timeout=10,
+            )
+            return host, (str(r.stdout).strip() if r.exit_status == 0 else "absent 0")
+    except Exception as e:
+        return host, f"error {e}"
+
+
+def kill_job(cfg_path: Path, job_id: str) -> int:
+    from .config import load_cluster_config
+    from .types import JobManifest
+
+    cfg = load_cluster_config(cfg_path)
+    manifest_path = Path(cfg_path).parent / "jobs" / job_id / "manifest.json"
+    if not manifest_path.exists():
+        print(f"kill: manifest not found at {manifest_path}", flush=True)
+        return 1
+    m = JobManifest.from_json(manifest_path.read_text())
+    # Reconstruct a minimal LaunchPlan-like view so _kill_all can iterate.
+    plan_like = LaunchPlan(
+        job_id=m.job_id,
+        exp_name=m.exp_name,
+        world_size=m.world_size,
+        master_host=m.master_host,
+        master_ip=m.master_ip,
+        main_port=m.main_port,
+        container_name=m.container_name,
+        image="(from-manifest)",
+        workers=[
+            WorkerSpec(
+                machine_rank=i,
+                host=n.host,
+                nproc_per_node=len(n.free_gpus),
+                cuda_visible_devices=",".join(str(g) for g in n.free_gpus),
+            )
+            for i, n in enumerate(m.nodes)
+        ],
+        nodes=m.nodes,
+    )
+    asyncio.run(_kill_all(plan_like, cfg))
+
+    # Flip status to "killed" on disk.
+    m_killed = JobManifest.from_json(manifest_path.read_text())
+    m_killed.status = "killed"
+    manifest_path.write_text(m_killed.to_json())
+    print(f"kill: containers removed across {len(m.nodes)} nodes", flush=True)
+    return 0
+
+
+def status_snapshot(cfg_path: Path, job_id: str) -> int:
+    from .config import load_cluster_config
+    from .types import JobManifest
+
+    cfg = load_cluster_config(cfg_path)
+    manifest_path = Path(cfg_path).parent / "jobs" / job_id / "manifest.json"
+    if not manifest_path.exists():
+        print(f"status: manifest not found at {manifest_path}", flush=True)
+        return 1
+    m = JobManifest.from_json(manifest_path.read_text())
+    print(f"job_id     : {m.job_id}")
+    print(f"exp_name   : {m.exp_name}")
+    print(f"started_at : {m.started_at}")
+    print(f"container  : {m.container_name}")
+    print(f"world_size : {m.world_size}")
+    print(f"status     : {m.status}")
+    print("per-host:")
+
+    async def _go() -> "list[tuple[str, str]]":
+        coros = [_docker_ps_one(n.host, m.container_name, cfg) for n in m.nodes]
+        return await asyncio.gather(*coros)
+
+    rows = asyncio.run(_go())
+    for host, state in rows:
+        print(f"  {host:20s} {state}")
+    return 0

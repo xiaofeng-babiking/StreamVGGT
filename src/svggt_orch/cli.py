@@ -83,8 +83,9 @@ def tb(ctx: click.Context, job_id: str, port: int) -> None:
 @click.pass_context
 def status(ctx: click.Context, job_id: str) -> None:
     """One-shot status snapshot for a job."""
-    click.echo(f"status {job_id}: not implemented yet", err=True)
-    ctx.exit(2)
+    from svggt_orch.launch import status_snapshot
+    code = status_snapshot(ctx.obj["config_path"], job_id)
+    ctx.exit(code)
 
 
 @main.command()
@@ -93,8 +94,9 @@ def status(ctx: click.Context, job_id: str) -> None:
 @click.pass_context
 def kill(ctx: click.Context, job_id: str) -> None:
     """Kill worker containers across all nodes for a job."""
-    click.echo(f"kill {job_id}: not implemented yet", err=True)
-    ctx.exit(2)
+    from svggt_orch.launch import kill_job
+    code = kill_job(ctx.obj["config_path"], job_id)
+    ctx.exit(code)
 
 
 if __name__ == "__main__":
