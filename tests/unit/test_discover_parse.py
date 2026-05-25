@@ -1,4 +1,11 @@
-from svggt_orch.discover import parse_nvidia_smi_csv, filter_idle_gpus, parse_ip_addr_show
+from pathlib import Path
+
+from svggt_orch.discover import (
+    parse_nvidia_smi_csv,
+    filter_idle_gpus,
+    parse_ip_addr_show,
+    dry_run_summary,
+)
 
 
 def test_parse_nvidia_smi_csv_six_gpus():
@@ -46,3 +53,15 @@ def test_parse_ip_addr_show_missing_returns_none():
     assert parse_ip_addr_show("[]") is None
     j = """[{"ifname":"ibs110","addr_info":[{"family":"inet6","local":"fe80::1"}]}]"""
     assert parse_ip_addr_show(j) is None
+
+
+def test_dry_run_summary_format():
+    summary = dry_run_summary(
+        hosts=["gpu003", "gpu004"],
+        idle_threshold_mib=500,
+        ssh_user="jing.feng",
+        identity_file="~/.ssh/id_ed25519",
+        timeout_s=5,
+    )
+    golden = Path(__file__).resolve().parents[1] / "golden" / "discover.txt"
+    assert summary.rstrip() == golden.read_text().rstrip()

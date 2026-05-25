@@ -1,0 +1,8 @@
+discover (dry-run)
+  ssh: jing.feng@<host>  -i ~/.ssh/id_ed25519  timeout=5s
+  hosts: ['gpu003', 'gpu004']
+  per-host commands:
+    nvidia-smi --query-gpu=index,memory.used --format=csv,noheader,nounits
+    ip -j addr show ibs110
+  idle_threshold_mib: 500
+  output: workflows/nodes.json

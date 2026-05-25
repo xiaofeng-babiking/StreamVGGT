@@ -29,11 +29,13 @@ def main(ctx: click.Context, config_path: Path) -> None:
 
 
 @main.command()
+@click.option("--dry-run", is_flag=True, help="Print the plan; do not SSH anywhere.")
 @click.pass_context
-def discover(ctx: click.Context) -> None:
+def discover(ctx: click.Context, dry_run: bool) -> None:
     """Scan candidate hosts for idle GPUs and write workflows/nodes.json."""
-    click.echo("discover: not implemented yet", err=True)
-    ctx.exit(2)
+    from svggt_orch.discover import run_discover
+    code = run_discover(ctx.obj["config_path"], dry_run=dry_run)
+    ctx.exit(code)
 
 
 @main.command()
