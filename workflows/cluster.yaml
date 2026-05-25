@@ -1,0 +1,41 @@
+ssh:
+  user: jing.feng
+  identity_file: ~/.ssh/id_ed25519
+  connect_timeout_s: 5
+
+# Pool of candidate hosts to scan during `discover`.
+# Edit to match your fleet; unreachable hosts are skipped gracefully.
+candidate_hosts:
+  - gpu003
+  - gpu004
+  - gpu005
+  - gpu006
+  - gpu007
+  - gpu008
+
+docker:
+  image: babiking/ubuntu:12.8.1-cudnn-devel-ubuntu24.04
+  shm_size: 16G
+
+paths:
+  repo: /jfs/jing.feng/codebases/StreamVGGT
+  venv: /jfs/jing.feng/codebases/StreamVGGT/.venv
+  jfs: /jfs
+
+discovery:
+  idle_threshold_mib: 500       # a GPU counts as idle if memory.used < this
+  min_idle_gpus_per_node: 1     # skip nodes with fewer idle GPUs
+
+nccl:
+  ib_hca: mlx5_1                # mlx5_0 is currently DOWN
+  socket_ifname: bond0
+  ib_disable: 0
+  async_error_handling: 1
+  debug: WARN                   # INFO during bring-up, then WARN
+  ib_timeout: 23
+  net_gdr_level: PIX
+
+train:
+  entrypoint: src/train.py
+  config_name: train
+  main_port: 26902
