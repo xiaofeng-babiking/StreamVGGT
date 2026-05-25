@@ -75,8 +75,9 @@ def monitor(ctx: click.Context, job_id: str) -> None:
 @click.pass_context
 def tb(ctx: click.Context, job_id: str, port: int) -> None:
     """Launch TensorBoard against this job's logs."""
-    click.echo(f"tb {job_id}: not implemented yet", err=True)
-    ctx.exit(2)
+    from svggt_orch.tb import run_tb
+    code = run_tb(ctx.obj["config_path"], job_id, port)
+    ctx.exit(code)
 
 
 @main.command()
