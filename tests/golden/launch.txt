@@ -1,0 +1,10 @@
+launch (dry-run)
+  job_id: 20260525-162300
+  exp_name: StreamVGGT_smoke
+  world_size: 4
+  master: gpu003 @ 10.10.100.5:26902
+  container: svggt-20260525-162300
+  image: babiking/ubuntu:12.8.1-cudnn-devel-ubuntu24.04
+  workers:
+    rank=0 host=gpu003 nproc=2 cuda=0,1
+    rank=1 host=gpu004 nproc=2 cuda=0,1

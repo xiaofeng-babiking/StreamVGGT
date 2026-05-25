@@ -39,11 +39,14 @@ def discover(ctx: click.Context, dry_run: bool) -> None:
 
 
 @main.command()
+@click.option("--dry-run", is_flag=True)
+@click.option("--exp-name", default=None, help="Override exp_name (else uses train.yaml default)")
 @click.pass_context
-def launch(ctx: click.Context) -> None:
+def launch(ctx: click.Context, dry_run: bool, exp_name: "str | None") -> None:
     """Launch the distributed training job."""
-    click.echo("launch: not implemented yet", err=True)
-    ctx.exit(2)
+    from svggt_orch.launch import run_launch
+    code = run_launch(ctx.obj["config_path"], dry_run=dry_run, exp_name=exp_name)
+    ctx.exit(code)
 
 
 @main.command()
