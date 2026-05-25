@@ -27,3 +27,9 @@ wandb/
 outputs/
 .hydra/
 *.log
+
+# Ignore superpowers docs
+docs/
+
+# Git worktrees (created by superpowers:using-git-worktrees)
+.worktrees/
