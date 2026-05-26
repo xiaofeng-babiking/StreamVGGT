@@ -5,6 +5,7 @@ import sys
 
 sys.path.append(osp.join(osp.dirname(__file__), "..", ".."))
 from dust3r.datasets.base.base_multiview_dataset import BaseMultiViewDataset
+from dust3r.datasets._io import load_cam_params
 from dust3r.utils.image import imread_cv2
 import h5py
 from tqdm import tqdm
@@ -13,10 +14,14 @@ from tqdm import tqdm
 class BlendedMVS_Multi(BaseMultiViewDataset):
     """Dataset of outdoor street scenes, 5 images each time"""
 
-    def __init__(self, *args, ROOT, split=None, **kwargs):
+    def __init__(self, *args, ROOT, split=None, data_format="auto", **kwargs):
         self.ROOT = ROOT
         self.video = False
         self.is_metric = False
+        # Per-frame camera params come from either <stem>.npz (canonical) or
+        # <stem>.safetensor (this cluster's preprocessing variant). 'auto'
+        # tries npz first and falls back to safetensor per file.
+        self.data_format = data_format
         super().__init__(*args, **kwargs)
         # assert split is None
         self._load_data()
@@ -270,7 +275,9 @@ class BlendedMVS_Multi(BaseMultiViewDataset):
             impath = basenames[view_idx].decode("utf-8")
             image = imread_cv2(osp.join(scene_dir, impath + ".jpg"))
             depthmap = imread_cv2(osp.join(scene_dir, impath + ".exr"))
-            camera_params = np.load(osp.join(scene_dir, impath + ".npz"))
+            camera_params = load_cam_params(
+                osp.join(scene_dir, impath), self.data_format
+            )
 
             intrinsics = np.float32(camera_params["intrinsics"])
             camera_pose = np.eye(4, dtype=np.float32)

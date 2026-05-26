@@ -6,12 +6,15 @@ import sys
 
 sys.path.append(osp.join(osp.dirname(__file__), "..", ".."))
 from dust3r.datasets.base.base_multiview_dataset import BaseMultiViewDataset
+from dust3r.datasets._io import load_cam_params
 from dust3r.utils.image import imread_cv2
 
 
 class MegaDepth_Multi(BaseMultiViewDataset):
-    def __init__(self, *args, ROOT, **kwargs):
+    def __init__(self, *args, ROOT, data_format="auto", **kwargs):
         self.ROOT = ROOT
+        # See blendedmvs.py for the rationale on the data_format kwarg.
+        self.data_format = data_format
         super().__init__(*args, **kwargs)
         self._load_data(self.split)
         self.is_metric = False
@@ -66,7 +69,9 @@ class MegaDepth_Multi(BaseMultiViewDataset):
             try:
                 image = imread_cv2(osp.join(seq_path, img + ".jpg"))
                 depthmap = imread_cv2(osp.join(seq_path, img + ".exr"))
-                camera_params = np.load(osp.join(seq_path, img + ".npz"))
+                camera_params = load_cam_params(
+                    osp.join(seq_path, img), self.data_format
+                )
             except Exception as e:
                 raise OSError(f"cannot load {img}, got exception {e}")
             intrinsics = np.float32(camera_params["intrinsics"])
