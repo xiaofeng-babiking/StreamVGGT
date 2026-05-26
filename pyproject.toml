@@ -22,7 +22,11 @@ dependencies = [
     # NOT bundle setuptools/pkg_resources. Older transitives (pyglet<2 etc.)
     # still import `pkg_resources` unconditionally — declare setuptools
     # explicitly so we don't hit ModuleNotFoundError at runtime.
-    "setuptools",
+    #
+    # Pin <81 because setuptools 81.0.0 REMOVED pkg_resources from the wheel
+    # (deprecated in 80, dropped in 81). Without the pin we get setuptools
+    # 82.x which still doesn't ship pkg_resources; same crash as no pin.
+    "setuptools<81",
     "huggingface-hub",
     "safetensors",
     "roma",

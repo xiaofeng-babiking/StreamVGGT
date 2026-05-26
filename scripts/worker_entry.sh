@@ -60,20 +60,20 @@ echo "[worker ${MACHINE_RANK}/${NUM_MACHINES}] dmon -> ${dmon_log}"
 
 cd /workspace/src
 
-# We use torchrun directly (not `accelerate launch`) because:
-#  1. accelerate's launcher only supports uniform per-machine GPU counts
-#     (it divides --num_processes by --num_machines). This cluster has
-#     heterogeneous nodes (e.g. 8 + 5 + 2 free GPUs); torchrun's
-#     --nproc_per_node accepts a per-machine value natively.
-#  2. train.py's Accelerator() reads the same env vars (RANK, WORLD_SIZE,
-#     LOCAL_RANK, MASTER_ADDR, MASTER_PORT) regardless of launcher, so
-#     accelerate's runtime API still drives the actual training.
-#  3. Drops one layer of indirection — accelerate launch internally
-#     execs torch.distributed.run anyway.
-exec torchrun \
-  --nnodes "${NUM_MACHINES}" \
-  --node_rank "${MACHINE_RANK}" \
-  --nproc_per_node "${NPROC_PER_NODE}" \
-  --master_addr "${MAIN_PROCESS_IP}" \
-  --master_port "${MAIN_PROCESS_PORT}" \
+# Use accelerate launch (matches the upstream README's invocation). The
+# orchestrator's discover.min_idle_gpus_per_node guarantee + the all-A100
+# fleet means free-GPU counts are uniform per node, so accelerate's
+# `num_processes / num_machines` even division yields the correct
+# per-machine worker count.
+#
+# Note: there is no `--num_processes_per_node` flag in accelerate's CLI
+# (that was torchrun's flag name). Per-machine count is derived from
+# --num_processes (total world size) divided by --num_machines.
+exec accelerate launch \
+  --multi_gpu \
+  --num_machines "${NUM_MACHINES}" \
+  --machine_rank "${MACHINE_RANK}" \
+  --num_processes "${NUM_PROCESSES}" \
+  --main_process_ip "${MAIN_PROCESS_IP}" \
+  --main_process_port "${MAIN_PROCESS_PORT}" \
   ./train.py --config-name "${CONFIG_NAME}"

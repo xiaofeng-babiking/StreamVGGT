@@ -555,11 +555,13 @@ train:
   <li>Activate <code>/workspace/.venv</code> via <code>VIRTUAL_ENV</code> + <code>PATH</code> (exit 12 if missing).</li>
   <li>Start background <code>nvidia-smi dmon -s pucvmet -d 2 -o T</code> → <code>workflows/jobs/&lt;jobid&gt;/dmon-&lt;host&gt;.csv</code>.</li>
   <li><code>cd /workspace/src</code>;
-      <code>exec torchrun --nnodes $N --node_rank $R --nproc_per_node $P --master_addr $IP --master_port $PORT ./train.py --config-name $CONFIG_NAME</code>.
-      (We use torchrun rather than <code>accelerate launch</code> because the cluster has heterogeneous
-      per-node GPU counts — torchrun's <code>--nproc_per_node</code> accepts per-machine values
-      natively; <code>Accelerator()</code> inside <code>train.py</code> still reads the same env vars
-      regardless of launcher.)
+      <code>exec accelerate launch --multi_gpu --num_machines $N --machine_rank $R --num_processes $TOTAL --main_process_ip $IP --main_process_port $PORT ./train.py --config-name $CONFIG_NAME</code>.
+      (accelerate's launcher is the native upstream invocation;
+      <code>--num_processes</code> is the TOTAL world size and accelerate
+      derives per-machine count by even division. This assumes a uniform
+      free-GPU count per node — the orchestrator's <code>discovery.min_idle_gpus_per_node</code>
+      gate enforces this; raise it to your full per-node GPU count to
+      refuse non-uniform launches.)
   </li>
 </ol>
 
