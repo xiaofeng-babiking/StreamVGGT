@@ -134,7 +134,15 @@ def _build_docker_cmd(cfg: "ClusterConfig", plan: LaunchPlan, w: WorkerSpec) -> 
     for k, v in {**nccl, **extra_env}.items():
         env_args.append(f"--env {k}={_shquote(v)}")
 
-    gpu_flag = f'--gpus "device={w.cuda_visible_devices}"'
+    # Nested-quoting form: outer single quotes survive the remote shell
+    # (bash -lc) and leave docker holding `"device=0,1,..."` as one literal
+    # argument. The single-layer form `--gpus "device=0,1,..."` gets stripped
+    # to `--gpus device=0,1,...` after shell parsing, which some docker engines
+    # misparse as both Count + DeviceIDs and reject with:
+    #   docker: Error response from daemon: cannot set both Count and DeviceIDs
+    #   on device request.
+    # See https://github.com/docker/cli/issues/2278
+    gpu_flag = f"--gpus '\"device={w.cuda_visible_devices}\"'"
 
     # Enter repo first so $(pwd) at lib/docker_env.sh sourcing time is the
     # repo root (the helper bind-mounts $(pwd) -> /workspace).
