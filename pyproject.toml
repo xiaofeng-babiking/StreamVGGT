@@ -18,6 +18,11 @@ dependencies = [
     "torchvision==0.25.0",
     "numpy==1.26.1",
     "Pillow==10.3.0",
+    # uv-managed Python (under .uv-python/) ships a minimal CPython that does
+    # NOT bundle setuptools/pkg_resources. Older transitives (pyglet<2 etc.)
+    # still import `pkg_resources` unconditionally — declare setuptools
+    # explicitly so we don't hit ModuleNotFoundError at runtime.
+    "setuptools",
     "huggingface-hub",
     "safetensors",
     "roma",
