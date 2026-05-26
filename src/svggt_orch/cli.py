@@ -41,11 +41,30 @@ def discover(ctx: click.Context, dry_run: bool) -> None:
 @main.command()
 @click.option("--dry-run", is_flag=True)
 @click.option("--exp-name", default=None, help="Override exp_name (else uses train.yaml default)")
+@click.option(
+    "--config-name",
+    "config_name",
+    default=None,
+    help=(
+        "Hydra config under config/ (e.g. train, train_smoke, finetune). "
+        "Overrides cluster.yaml#train.config_name; defaults to the cluster.yaml value."
+    ),
+)
 @click.pass_context
-def launch(ctx: click.Context, dry_run: bool, exp_name: "str | None") -> None:
+def launch(
+    ctx: click.Context,
+    dry_run: bool,
+    exp_name: "str | None",
+    config_name: "str | None",
+) -> None:
     """Launch the distributed training job."""
     from svggt_orch.launch import run_launch
-    code = run_launch(ctx.obj["config_path"], dry_run=dry_run, exp_name=exp_name)
+    code = run_launch(
+        ctx.obj["config_path"],
+        dry_run=dry_run,
+        exp_name=exp_name,
+        config_name=config_name,
+    )
     ctx.exit(code)
 
 

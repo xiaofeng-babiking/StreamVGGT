@@ -33,6 +33,7 @@ class WorkerSpec:
 class LaunchPlan:
     job_id: str
     exp_name: str
+    config_name: str  # Hydra config name passed to train.py via --config-name
     world_size: int
     master_host: str
     master_ip: str
@@ -48,7 +49,15 @@ def build_launch_plan(
     nodes: "list[NodeInfo]",
     job_id: str,
     exp_name: str,
+    config_name: "str | None" = None,
 ) -> LaunchPlan:
+    """Build the per-worker plan.
+
+    Args:
+        config_name: optional override for cfg.train.config_name. When None,
+            falls back to the value in cluster.yaml. This is what the
+            `launch --config-name X` CLI flag plumbs through.
+    """
     if not nodes:
         raise ValueError("build_launch_plan: nodes list is empty")
     workers: list[WorkerSpec] = []
@@ -66,6 +75,7 @@ def build_launch_plan(
     return LaunchPlan(
         job_id=job_id,
         exp_name=exp_name,
+        config_name=config_name or cfg.train.config_name,
         world_size=sum(w.nproc_per_node for w in workers),
         master_host=master.host,
         master_ip=master_ip,
@@ -82,6 +92,7 @@ def render_launch_plan_for_print(plan: LaunchPlan) -> str:
         "launch (dry-run)",
         f"  job_id: {plan.job_id}",
         f"  exp_name: {plan.exp_name}",
+        f"  config_name: {plan.config_name}",
         f"  world_size: {plan.world_size}",
         f"  master: {plan.master_host} @ {plan.master_ip}:{plan.main_port}",
         f"  container: {plan.container_name}",
@@ -117,7 +128,7 @@ def _build_docker_cmd(cfg: "ClusterConfig", plan: LaunchPlan, w: WorkerSpec) -> 
         "NPROC_PER_NODE": str(w.nproc_per_node),
         "MAIN_PROCESS_IP": plan.master_ip,
         "MAIN_PROCESS_PORT": str(plan.main_port),
-        "CONFIG_NAME": cfg.train.config_name,
+        "CONFIG_NAME": plan.config_name,
         "CUDA_VISIBLE_DEVICES": w.cuda_visible_devices,
     }
     for k, v in {**nccl, **extra_env}.items():
@@ -189,7 +200,12 @@ def write_manifest(plan: LaunchPlan, manifest_dir: Path) -> Path:
     return p
 
 
-def run_launch(cfg_path: Path, dry_run: bool, exp_name: "str | None") -> int:
+def run_launch(
+    cfg_path: Path,
+    dry_run: bool,
+    exp_name: "str | None",
+    config_name: "str | None" = None,
+) -> int:
     from .config import load_cluster_config
     from .types import NodeInfo
 
@@ -206,7 +222,10 @@ def run_launch(cfg_path: Path, dry_run: bool, exp_name: "str | None") -> int:
 
     job_id = _dt.datetime.utcnow().strftime("%Y%m%d-%H%M%S")
     plan = build_launch_plan(
-        cfg, nodes, job_id=job_id, exp_name=exp_name or "StreamVGGT_run",
+        cfg, nodes,
+        job_id=job_id,
+        exp_name=exp_name or "StreamVGGT_run",
+        config_name=config_name,  # None -> use cfg.train.config_name
     )
 
     if dry_run:
@@ -273,6 +292,7 @@ def kill_job(cfg_path: Path, job_id: str) -> int:
     plan_like = LaunchPlan(
         job_id=m.job_id,
         exp_name=m.exp_name,
+        config_name="(from-manifest)",
         world_size=m.world_size,
         master_host=m.master_host,
         master_ip=m.master_ip,

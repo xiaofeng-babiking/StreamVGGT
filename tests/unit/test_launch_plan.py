@@ -63,3 +63,30 @@ def test_render_launch_plan_for_print_matches_golden():
     out = render_launch_plan_for_print(plan)
     golden = (Path(__file__).resolve().parents[1] / "golden" / "launch.txt").read_text()
     assert out.rstrip() == golden.rstrip()
+
+
+def test_config_name_defaults_to_cluster_yaml():
+    nodes = [NodeInfo("gpu003", "172.31.208.5", "10.10.100.5", [0], "t")]
+    plan = build_launch_plan(_cfg(), nodes, job_id="J", exp_name="x")
+    # _cfg() uses default TrainConfig() → config_name = "train"
+    assert plan.config_name == "train"
+
+
+def test_config_name_override_takes_effect():
+    nodes = [NodeInfo("gpu003", "172.31.208.5", "10.10.100.5", [0], "t")]
+    plan = build_launch_plan(
+        _cfg(), nodes, job_id="J", exp_name="x", config_name="train_smoke"
+    )
+    assert plan.config_name == "train_smoke"
+
+
+def test_config_name_override_propagates_to_docker_env():
+    # The override must reach the CONFIG_NAME env var in the docker run command.
+    from svggt_orch.launch import _build_docker_cmd
+    nodes = [NodeInfo("gpu003", "172.31.208.5", "10.10.100.5", [0], "t")]
+    plan = build_launch_plan(
+        _cfg(), nodes, job_id="J", exp_name="x", config_name="finetune"
+    )
+    cmd = _build_docker_cmd(_cfg(), plan, plan.workers[0])
+    assert "CONFIG_NAME=finetune" in cmd
+    assert "CONFIG_NAME=train" not in cmd  # cfg.train.config_name was overridden

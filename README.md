@@ -262,6 +262,10 @@ cat workflows/nodes.json
 ```bash
 ./scripts/svggt-orch launch --dry-run --exp-name StreamVGGT_alpha0.1_lr1e-5_nog
 ./scripts/svggt-orch launch --exp-name StreamVGGT_alpha0.1_lr1e-5_nog
+
+# Override which hydra config train.py loads (without editing cluster.yaml):
+./scripts/svggt-orch launch --config-name train_smoke --exp-name StreamVGGT_smoke
+./scripts/svggt-orch launch --config-name finetune   --exp-name VGGT_finetune
 ```
 
 The launcher:
