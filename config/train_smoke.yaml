@@ -1,8 +1,8 @@
 # Smoke variant of train.yaml — runs ~20 steps on a tiny subset for L4 testing.
 # Mirrors config/train.yaml with overrides for fast iteration.
 
-teacher: ../ckpt/model.pt
-pretrained: ../ckpt/model.pt
+teacher: /jfs/jing.feng/checkpoints/VGGT-1B/model.pt
+pretrained: /jfs/jing.feng/checkpoints/VGGT-1B/model.pt
 load_only_encoder: False
 long_context: False
 fixed_length: True
@@ -17,12 +17,12 @@ train_criterion: DistillLoss()
 test_criterion: DistillLoss()
 allow_repeat: False
 
-dataset1: Co3d_Multi(allow_repeat=${allow_repeat}, split='train', ROOT='../data/train/processed_co3d/',
+dataset1: Co3d_Multi(allow_repeat=${allow_repeat}, split='train', ROOT='/jfs/Data_4DFF/train_data/co3d',
   aug_crop=16, resolution=[(518, 392)],
   transform=SeqColorJitter, num_views=${num_views}, n_corres=${n_corres_train})
 
 train_dataset: 100 @ ${dataset1}
-test_dataset: 20 @ ARKitScenes_Multi(split='test', ROOT='../data/train/processed_arkitscenes/', resolution=(518, 392), num_views=${num_test_views}, seed=42, n_corres=${n_corres_test})
+test_dataset: 20 @ ARKitScenes_Multi(split='Test', ROOT='/jfs/Data_4DFF/train_data/arkitscenes', resolution=(518, 392), num_views=${num_test_views}, seed=42, n_corres=${n_corres_test})
 
 seed: 0
 batch_size: 1

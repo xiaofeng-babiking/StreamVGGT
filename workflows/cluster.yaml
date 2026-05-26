@@ -43,5 +43,5 @@ nccl:
 
 train:
   entrypoint: src/train.py
-  config_name: train
+  config_name: train_smoke    # was: train (full distillation). Swap back when smoke passes.
   main_port: 26902
