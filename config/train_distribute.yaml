@@ -1,0 +1,128 @@
+# Full distributed-training variant of train.yaml.
+#
+# Same hyperparameters and mixing weights as train.yaml, but with absolute /jfs
+# paths matched to this cluster's actual data layout under
+# /jfs/Data_4DFF/train_data/, and split arguments adjusted for the on-disk dir
+# names (e.g. ARKitScenes uses Training, not train).
+#
+# Datasets dropped vs train.yaml (not present under /jfs/Data_4DFF/train_data/):
+#   * dataset4 ARKitScenesHighRes_Multi  -- no `_highres` companion dir
+#   * dataset5 ScanNetpp_Multi           -- scannetpp not in the data root
+# The remaining 13 datasets keep their original mixing weights, so the total
+# per-epoch sample count drops from 39000 to 34500 (~12% smaller epoch).
+
+teacher: /jfs/jing.feng/checkpoints/VGGT-1B/model.pt
+pretrained: /jfs/jing.feng/checkpoints/VGGT-1B/model.pt
+load_only_encoder: False
+long_context: False
+fixed_length: True
+resume: Null
+benchmark: False
+num_views : 10
+num_test_views : 4
+n_corres_train: 0
+n_corres_test: 0
+
+train_criterion: DistillLoss()
+test_criterion: DistillLoss()
+allow_repeat: False
+
+# --- 13 dataset roots, all under /jfs/Data_4DFF/train_data/ ---
+# Path/split conventions verified per-loader:
+#   * Co3d / WildRGBD : split picks selected_seqs_<split>.json at ROOT (not a path segment)
+#   * ARKitScenes     : split IS the path segment; Training (capital) matches on-disk dir
+#   * ScanNet         : loader maps split=='train' -> ROOT/scans_train internally
+#   * HyperSim / BlendedMVS / MegaDepth : scenes are direct children of ROOT
+#   * Waymo / VKITTI2 / OmniObject3D / Spring / MVS_Synth : split is metadata only;
+#       ROOT points at the inner `train/` dir where scenes actually live
+#   * PointOdyssey    : loader uses ROOT/<split>/<scene>, so ROOT is the dir with
+#       train/test/val subdirs and split='train' picks the right one
+
+dataset1: Co3d_Multi(allow_repeat=${allow_repeat}, split='train', ROOT='/jfs/Data_4DFF/train_data/co3d',
+  aug_crop=16, resolution=[(518, 392), (518, 336), (518, 294), (518, 266), (518, 210), (518, 154), (392, 518), (336, 518), (294, 518), (266, 518)],
+  transform=SeqColorJitter, num_views=${num_views}, n_corres=${n_corres_train})
+dataset2: WildRGBD_Multi(allow_repeat=${allow_repeat}, split='train', ROOT='/jfs/Data_4DFF/train_data/wildrgbd',
+  aug_crop=16, resolution=[(518, 392), (518, 336), (518, 294), (518, 266), (518, 210), (518, 154), (392, 518), (336, 518), (294, 518), (266, 518)],
+  transform=SeqColorJitter, num_views=${num_views}, n_corres=${n_corres_train})
+dataset3: ARKitScenes_Multi(allow_repeat=${allow_repeat}, split='Training', ROOT='/jfs/Data_4DFF/train_data/arkitscenes',
+  aug_crop=16, resolution=[(518, 392), (518, 336), (518, 294), (518, 266), (518, 210), (518, 154), (392, 518), (336, 518), (294, 518), (266, 518)],
+  transform=SeqColorJitter, num_views=${num_views}, n_corres=${n_corres_train})
+dataset6: ScanNet_Multi(allow_repeat=${allow_repeat}, split='train', ROOT='/jfs/Data_4DFF/train_data/scannet',
+  aug_crop=16, resolution=[(518, 392), (518, 336), (518, 294), (518, 266), (518, 210), (518, 154), (392, 518), (336, 518), (294, 518), (266, 518)],
+  transform=SeqColorJitter, num_views=${num_views}, n_corres=${n_corres_train})
+dataset7: HyperSim_Multi(allow_repeat=${allow_repeat}, split='train', ROOT='/jfs/Data_4DFF/train_data/hypersim',
+  aug_crop=16, resolution=[(518, 392), (518, 336), (518, 294), (518, 266), (518, 210), (518, 154), (392, 518), (336, 518), (294, 518), (266, 518)],
+  transform=SeqColorJitter, num_views=${num_views}, n_corres=${n_corres_train})
+dataset8: BlendedMVS_Multi(allow_repeat=${allow_repeat}, split=None, ROOT='/jfs/Data_4DFF/train_data/blendedmvs',
+  aug_crop=16, resolution=[(518, 392), (518, 336), (518, 294), (518, 266), (518, 210), (518, 154), (392, 518), (336, 518), (294, 518), (266, 518)],
+  transform=SeqColorJitter, num_views=${num_views}, n_corres=${n_corres_train})
+dataset9: MegaDepth_Multi(allow_repeat=${allow_repeat}, split='train', ROOT='/jfs/Data_4DFF/train_data/megadepth',
+  aug_crop=16, resolution=[(518, 392), (518, 336), (518, 294), (518, 266), (518, 210), (518, 154), (392, 518), (336, 518), (294, 518), (266, 518)],
+  transform=SeqColorJitter, num_views=${num_views}, n_corres=${n_corres_train})
+dataset10: Waymo_Multi(allow_repeat=${allow_repeat}, split=None, ROOT='/jfs/Data_4DFF/train_data/waymo/train',
+  aug_crop=16, resolution=[(518, 392), (518, 336), (518, 294), (518, 266), (518, 210), (518, 154), (392, 518), (336, 518), (294, 518), (266, 518)],
+  transform=SeqColorJitter, num_views=${num_views}, n_corres=${n_corres_train})
+dataset11: VirtualKITTI2_Multi(allow_repeat=${allow_repeat}, split=None, ROOT='/jfs/Data_4DFF/train_data/vkitti/train',
+  aug_crop=16, resolution=[(518, 392), (518, 336), (518, 294), (518, 266), (518, 210), (518, 154), (392, 518), (336, 518), (294, 518), (266, 518)],
+  transform=SeqColorJitter, num_views=${num_views}, n_corres=${n_corres_train})
+dataset12: OmniObject3D_Multi(allow_repeat=${allow_repeat}, split=None, ROOT='/jfs/Data_4DFF/train_data/omniobject3d/train',
+  aug_crop=16, resolution=[(518, 392), (518, 336), (518, 294), (518, 266), (518, 210), (518, 154), (392, 518), (336, 518), (294, 518), (266, 518)],
+  transform=SeqColorJitter, num_views=${num_views}, n_corres=${n_corres_train})
+dataset13: Spring(allow_repeat=${allow_repeat}, split=None, ROOT='/jfs/Data_4DFF/train_data/spring/train',
+  aug_crop=16, resolution=[(518, 392), (518, 336), (518, 294), (518, 266), (518, 210), (518, 154), (392, 518), (336, 518), (294, 518), (266, 518)],
+  transform=SeqColorJitter, num_views=${num_views}, n_corres=${n_corres_train})
+dataset14: MVS_Synth_Multi(allow_repeat=${allow_repeat}, split='train', ROOT='/jfs/Data_4DFF/train_data/mvs_synth/train',
+  aug_crop=16, resolution=[(518, 392), (518, 336), (518, 294), (518, 266), (518, 210), (518, 154), (392, 518), (336, 518), (294, 518), (266, 518)],
+  transform=SeqColorJitter, num_views=${num_views}, n_corres=${n_corres_train})
+dataset15: PointOdyssey_Multi(allow_repeat=${allow_repeat}, split='train', ROOT='/jfs/Data_4DFF/train_data/pointodyssey',
+  aug_crop=16, resolution=[(518, 392), (518, 336), (518, 294), (518, 266), (518, 210), (518, 154), (392, 518), (336, 518), (294, 518), (266, 518)],
+  transform=SeqColorJitter, num_views=${num_views}, n_corres=${n_corres_train})
+
+# Mixing weights preserved from train.yaml; dataset4 (ARKitScenesHighRes, 2250 @)
+# and dataset5 (ScanNetpp, 2250 @) are omitted because their data isn't present.
+# Per-epoch sample count: 34500 (vs 39000 upstream).
+train_dataset: 4500 @ ${dataset1} + 4500 @ ${dataset2} + 4500 @ ${dataset3}
+              + 4500 @ ${dataset6} + 1200 @ ${dataset7} + 2250 @ ${dataset8} + 2250 @ ${dataset9} + 2250 @ ${dataset10}
+              + 2250 @ ${dataset11} + 1800 @ ${dataset12} + 1800 @ ${dataset13} + 450 @ ${dataset14} + 2250 @ ${dataset15}
+
+# Eval on ARKitScenes test split (capital T on disk; loader uses split as a path segment).
+test_dataset: 1000 @ ARKitScenes_Multi(split='Test', ROOT='/jfs/Data_4DFF/train_data/arkitscenes', resolution=(518, 392), num_views=${num_test_views}, seed=42, n_corres=${n_corres_test})
+
+seed: 0
+batch_size: 1
+accum_iter: 1
+gradient_checkpointing: False
+epochs: 10
+start_epoch: 0
+start_step: 0
+weight_decay: 0.05
+lr: 1e-5
+min_lr: 1e-7
+warmup_epochs: 0.5
+amp: 1
+
+num_workers: 12
+world_size: 1
+local-rank: -1
+dist_url: 'env://'
+rank: 0
+gpu: 0
+distributed: False
+dist_backend: 'nccl'
+
+eval_freq: 1
+save_freq: 0.1
+max_checkpoints: 10
+keep_freq: 1
+print_freq: 10
+print_img_freq: 50000000
+num_imgs_vis: 4
+save_dir: '../checkpoints'
+exp_name: 'StreamVGGT_distribute'
+task: 'StreamVGGT'
+logdir: ${save_dir}/${exp_name}/logs
+output_dir: ${save_dir}/${exp_name}/
+hydra:
+  verbose: True
+  run:
+    dir: ${save_dir}/${exp_name}
