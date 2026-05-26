@@ -9,6 +9,7 @@ import json
 sys.path.append(osp.join(osp.dirname(__file__), "..", ".."))
 from tqdm import tqdm
 from dust3r.datasets.base.base_multiview_dataset import BaseMultiViewDataset
+from dust3r.datasets._io import detect_layout_depth, walk_nested_scenes
 from dust3r.utils.image import imread_cv2
 import re
 
@@ -21,22 +22,41 @@ def extract_number(filename):
 
 
 class OmniObject3D_Multi(BaseMultiViewDataset):
-    def __init__(self, *args, ROOT, **kwargs):
+    def __init__(self, *args, ROOT, nested_layout="auto", **kwargs):
         self.ROOT = ROOT
         self.video = False
         self.is_metric = False  # True
+        # On the upstream layout, scenes are direct children of ROOT
+        # (depth=1). On this cluster, the preprocessing pipeline kept
+        # an extra <category>/<instance> nesting under ROOT (depth=2).
+        # 'auto' probes the filesystem; True/False force the choice.
+        self.nested_layout = nested_layout
         super().__init__(*args, **kwargs)
 
         self.loaded_data = self._load_data()
 
+    def _scene_depth(self) -> int:
+        if self.nested_layout is True:
+            return 2
+        if self.nested_layout is False:
+            return 1
+        # 'auto': use rgb/depth/cam markers to find the scene level.
+        depth = detect_layout_depth(self.ROOT)
+        return depth if depth and depth >= 1 else 1
+
     def _load_data(self):
-        self.scenes = [
-            d
-            for d in os.listdir(self.ROOT)
-            if os.path.isdir(os.path.join(self.ROOT, d)) and not d.startswith('.')  
-        ]
-        with open(os.path.join(self.ROOT, "scale.json"), "r") as f:
-            self.scales = json.load(f)
+        scene_depth = self._scene_depth()
+        self.scenes = walk_nested_scenes(self.ROOT, scene_depth)
+        # scale.json is optional on this cluster (the canonical preprocess
+        # writes it; the variant pipeline on /jfs does not). Fall back to
+        # scale=1.0 per scene; depths will be in raw units. Distillation
+        # losses are typically scale-invariant, so training still works.
+        scale_path = os.path.join(self.ROOT, "scale.json")
+        if osp.exists(scale_path):
+            with open(scale_path, "r") as f:
+                self.scales = json.load(f)
+        else:
+            self.scales = {}
         offset = 0
         scenes = []
         sceneids = []
@@ -110,7 +130,7 @@ class OmniObject3D_Multi(BaseMultiViewDataset):
             cam = np.load(osp.join(cam_dir, basename + ".npz"))
             camera_pose = cam["pose"]
             intrinsics = cam["intrinsics"]
-            scale = self.scales[self.scenes[scene_id]]
+            scale = self.scales.get(self.scenes[scene_id], 1.0)
             depthmap = depthmap / scale / 1000.0
             camera_pose[:3, 3] = camera_pose[:3, 3] / scale / 1000.0
 
