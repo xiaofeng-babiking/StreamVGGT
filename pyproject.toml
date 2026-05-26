@@ -14,8 +14,8 @@ authors = [
     { name = "Jiwen Lu" },
 ]
 dependencies = [
-    "torch==2.3.1",
-    "torchvision==0.18.1",
+    "torch==2.10.0",
+    "torchvision==0.25.0",
     "numpy==1.26.1",
     "Pillow==10.3.0",
     "huggingface-hub",
@@ -74,15 +74,15 @@ dev = [
 package = false
 
 [[tool.uv.index]]
-name = "tsinghua"
-url = "https://pypi.tuna.tsinghua.edu.cn/simple/"
+name = "aliyun"
+url = "http://mirrors.aliyun.com/pypi/simple/"
 default = true
 
 [[tool.uv.index]]
-name = "pytorch-cu121"
-url = "https://download.pytorch.org/whl/cu121"
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
 explicit = true
 
 [tool.uv.sources]
-torch = { index = "pytorch-cu121" }
-torchvision = { index = "pytorch-cu121" }
+torch = { index = "pytorch-cu128" }
+torchvision = { index = "pytorch-cu128" }
