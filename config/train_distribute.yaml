@@ -63,10 +63,10 @@ dataset6: ScanNet_Multi(allow_repeat=${allow_repeat}, split='train', ROOT='/jfs/
 dataset7: HyperSim_Multi(allow_repeat=${allow_repeat}, split='train', ROOT='/jfs/Data_4DFF/train_data/hypersim',
   aug_crop=16, resolution=[(518, 392), (518, 336), (518, 294), (518, 266), (518, 210), (518, 154), (392, 518), (336, 518), (294, 518), (266, 518)],
   transform=SeqColorJitter, num_views=${num_views}, n_corres=${n_corres_train})
-dataset8: BlendedMVS_Multi(allow_repeat=${allow_repeat}, split=None, ROOT='/jfs/Data_4DFF/train_data/blendedmvs',
+dataset8: BlendedMVS_Multi(allow_repeat=${allow_repeat}, split=None, ROOT='/jfs/Data_4DFF/train_data/blendedmvs', data_format='safetensor',
   aug_crop=16, resolution=[(518, 392), (518, 336), (518, 294), (518, 266), (518, 210), (518, 154), (392, 518), (336, 518), (294, 518), (266, 518)],
   transform=SeqColorJitter, num_views=${num_views}, n_corres=${n_corres_train})
-dataset9: MegaDepth_Multi(allow_repeat=${allow_repeat}, split='train', ROOT='/jfs/Data_4DFF/train_data/megadepth',
+dataset9: MegaDepth_Multi(allow_repeat=${allow_repeat}, split='train', ROOT='/jfs/Data_4DFF/train_data/megadepth', data_format='safetensor',
   aug_crop=16, resolution=[(518, 392), (518, 336), (518, 294), (518, 266), (518, 210), (518, 154), (392, 518), (336, 518), (294, 518), (266, 518)],
   transform=SeqColorJitter, num_views=${num_views}, n_corres=${n_corres_train})
 dataset10: Waymo_Multi(allow_repeat=${allow_repeat}, split=None, ROOT='/jfs/Data_4DFF/train_data/waymo/train',
@@ -75,7 +75,7 @@ dataset10: Waymo_Multi(allow_repeat=${allow_repeat}, split=None, ROOT='/jfs/Data
 dataset11: VirtualKITTI2_Multi(allow_repeat=${allow_repeat}, split=None, ROOT='/jfs/Data_4DFF/train_data/vkitti/train',
   aug_crop=16, resolution=[(518, 392), (518, 336), (518, 294), (518, 266), (518, 210), (518, 154), (392, 518), (336, 518), (294, 518), (266, 518)],
   transform=SeqColorJitter, num_views=${num_views}, n_corres=${n_corres_train})
-dataset12: OmniObject3D_Multi(allow_repeat=${allow_repeat}, split=None, ROOT='/jfs/Data_4DFF/train_data/omniobject3d/train',
+dataset12: OmniObject3D_Multi(allow_repeat=${allow_repeat}, split=None, ROOT='/jfs/Data_4DFF/train_data/omniobject3d/train', nested_layout=True,
   aug_crop=16, resolution=[(518, 392), (518, 336), (518, 294), (518, 266), (518, 210), (518, 154), (392, 518), (336, 518), (294, 518), (266, 518)],
   transform=SeqColorJitter, num_views=${num_views}, n_corres=${n_corres_train})
 dataset13: Spring(allow_repeat=${allow_repeat}, split=None, ROOT='/jfs/Data_4DFF/train_data/spring/train',
