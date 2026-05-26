@@ -102,14 +102,10 @@ async def _sample_one(
 ) -> HostSample:
     import asyncssh  # lazy
 
+    from .config import asyncssh_connect_kwargs
+
     try:
-        async with asyncssh.connect(
-            host,
-            username=cfg.ssh.user,
-            client_keys=[str(Path(cfg.ssh.identity_file).expanduser())],
-            known_hosts=None,
-            connect_timeout=cfg.ssh.connect_timeout_s,
-        ) as conn:
+        async with asyncssh.connect(host, **asyncssh_connect_kwargs(cfg)) as conn:
             dmon = await conn.run(
                 _DMON_TAIL_CMD.format(job=job_id), check=False, timeout=10
             )

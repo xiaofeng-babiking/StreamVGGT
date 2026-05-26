@@ -7,11 +7,19 @@
   "properties": {
     "ssh": {
       "type": "object",
-      "required": ["user", "identity_file"],
+      "required": ["user"],
       "additionalProperties": false,
+      "anyOf": [
+        {"required": ["identity_file"]},
+        {"required": ["password"]}
+      ],
       "properties": {
         "user": {"type": "string"},
         "identity_file": {"type": "string"},
+        "password": {
+          "type": "string",
+          "description": "Plaintext SSH password OR ${ENV_VAR} interpolation"
+        },
         "connect_timeout_s": {"type": "integer", "minimum": 1}
       }
     },

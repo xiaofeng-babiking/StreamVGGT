@@ -1,17 +1,23 @@
 ssh:
   user: jing.feng
-  identity_file: ~/.ssh/id_ed25519
+  # Pick at least one of identity_file / password. asyncssh tries the key
+  # first, then falls back to the password. Both work for IPs and hostnames.
+  #
+  #   identity_file: ~/.ssh/id_ed25519         # SSH key (preferred for prod)
+  #   password: "my-plaintext-password"        # literal — TRIGGERS a WARN at load
+  #   password: "${SSH_PASSWORD}"              # env-var interpolation (recommended)
+  #
+  password: "${SSH_PASSWORD}"
   connect_timeout_s: 5
 
 # Pool of candidate hosts to scan during `discover`.
 # Edit to match your fleet; unreachable hosts are skipped gracefully.
 candidate_hosts:
-  - gpu003
-  - gpu004
-  - gpu005
-  - gpu006
-  - gpu007
-  - gpu008
+  - 172.31.208.3
+  - 172.31.208.4
+  - 172.31.208.5
+  - 172.31.208.6
+  - 172.31.208.7
 
 docker:
   image: babiking/ubuntu:12.8.1-cudnn-devel-ubuntu24.04

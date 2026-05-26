@@ -25,18 +25,14 @@ async def _tail_one(
 ) -> None:
     import asyncssh  # lazy
 
+    from .config import asyncssh_connect_kwargs
+
     color = _RANK_COLORS[rank % len(_RANK_COLORS)]
     prefix = f"[r={rank:02d} h={host}] "
     out_file = job_dir / f"rank-{rank:02d}.log"
     out_file.parent.mkdir(parents=True, exist_ok=True)
     try:
-        async with asyncssh.connect(
-            host,
-            username=cfg.ssh.user,
-            client_keys=[str(Path(cfg.ssh.identity_file).expanduser())],
-            known_hosts=None,
-            connect_timeout=cfg.ssh.connect_timeout_s,
-        ) as conn:
+        async with asyncssh.connect(host, **asyncssh_connect_kwargs(cfg)) as conn:
             with out_file.open("a", buffering=1) as fp:
                 proc = await conn.create_process(
                     f"docker logs -f --since=0s {container} 2>&1"

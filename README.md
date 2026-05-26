@@ -191,7 +191,10 @@ The script is idempotent, `flock`-protected against concurrent peer invocations,
 ```yaml
 ssh:
   user: jing.feng
-  identity_file: ~/.ssh/id_ed25519
+  # Pick at least one auth method (asyncssh tries key first, then password):
+  identity_file: ~/.ssh/id_ed25519          # SSH key (preferred)
+  # password: "${SSH_PASSWORD}"             # env-var interpolation (no plaintext in git)
+  # password: "my-plaintext-pw"             # literal — warns at load
   connect_timeout_s: 5
 
 candidate_hosts:                 # hostnames OR IPs work; mix freely

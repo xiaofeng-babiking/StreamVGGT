@@ -77,16 +77,11 @@ async def _probe_one_host(host: str, cfg: "ClusterConfig") -> "NodeInfo | None":
     """SSH into `host`, query nvidia-smi and ibs110 IP. Return None on any failure."""
     import asyncssh  # lazy: keep module importable without asyncssh
 
+    from .config import asyncssh_connect_kwargs
     from .types import NodeInfo
 
     try:
-        async with asyncssh.connect(
-            host,
-            username=cfg.ssh.user,
-            client_keys=[str(Path(cfg.ssh.identity_file).expanduser())],
-            known_hosts=None,  # cluster-internal; trust on first use
-            connect_timeout=cfg.ssh.connect_timeout_s,
-        ) as conn:
+        async with asyncssh.connect(host, **asyncssh_connect_kwargs(cfg)) as conn:
             smi = await conn.run(
                 "nvidia-smi --query-gpu=index,memory.used "
                 "--format=csv,noheader,nounits",

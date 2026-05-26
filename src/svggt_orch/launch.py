@@ -146,13 +146,9 @@ async def _start_one(
 ) -> "tuple[str, int, str, str]":
     import asyncssh  # lazy
 
-    async with asyncssh.connect(
-        host,
-        username=cfg.ssh.user,
-        client_keys=[str(Path(cfg.ssh.identity_file).expanduser())],
-        known_hosts=None,
-        connect_timeout=cfg.ssh.connect_timeout_s,
-    ) as conn:
+    from .config import asyncssh_connect_kwargs
+
+    async with asyncssh.connect(host, **asyncssh_connect_kwargs(cfg)) as conn:
         r = await conn.run(f"bash -lc {_shquote(docker_cmd)}", check=False, timeout=120)
         return host, r.exit_status, str(r.stdout or ""), str(r.stderr or "")
 
@@ -160,15 +156,11 @@ async def _start_one(
 async def _kill_all(plan: LaunchPlan, cfg: "ClusterConfig") -> None:
     import asyncssh  # lazy
 
+    from .config import asyncssh_connect_kwargs
+
     async def _one(host: str) -> None:
         try:
-            async with asyncssh.connect(
-                host,
-                username=cfg.ssh.user,
-                client_keys=[str(Path(cfg.ssh.identity_file).expanduser())],
-                known_hosts=None,
-                connect_timeout=cfg.ssh.connect_timeout_s,
-            ) as conn:
+            async with asyncssh.connect(host, **asyncssh_connect_kwargs(cfg)) as conn:
                 await conn.run(f"docker rm -f {plan.container_name}", check=False, timeout=30)
         except Exception:
             pass
@@ -253,14 +245,10 @@ async def _docker_ps_one(
 ) -> "tuple[str, str]":
     import asyncssh  # lazy
 
+    from .config import asyncssh_connect_kwargs
+
     try:
-        async with asyncssh.connect(
-            host,
-            username=cfg.ssh.user,
-            client_keys=[str(Path(cfg.ssh.identity_file).expanduser())],
-            known_hosts=None,
-            connect_timeout=cfg.ssh.connect_timeout_s,
-        ) as conn:
+        async with asyncssh.connect(host, **asyncssh_connect_kwargs(cfg)) as conn:
             r = await conn.run(
                 f"docker inspect -f '{{{{.State.Status}}}} {{{{.State.ExitCode}}}}' {container}",
                 check=False,
