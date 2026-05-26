@@ -11,6 +11,7 @@ dist/
 
 # uv
 .venv/
+.uv-python/            # UV_PYTHON_INSTALL_DIR — see scripts/bootstrap_venv.sh
 .python-version.local
 
 # Editors
