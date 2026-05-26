@@ -32,11 +32,21 @@ allow_repeat: False
 #   * Co3d / WildRGBD : split picks selected_seqs_<split>.json at ROOT (not a path segment)
 #   * ARKitScenes     : split IS the path segment; Training (capital) matches on-disk dir
 #   * ScanNet         : loader maps split=='train' -> ROOT/scans_train internally
-#   * HyperSim / BlendedMVS / MegaDepth : scenes are direct children of ROOT
-#   * Waymo / VKITTI2 / OmniObject3D / Spring / MVS_Synth : split is metadata only;
-#       ROOT points at the inner `train/` dir where scenes actually live
+#   * HyperSim        : scenes are direct children of ROOT
+#   * BlendedMVS / MegaDepth : scenes are direct children of ROOT. Per-frame cam
+#                       params on this cluster are .safetensor (not the upstream .npz);
+#                       the loaders' default data_format='auto' handles both formats.
+#   * VKITTI2 / OmniObject3D : loader walks an extra directory level for this
+#                       cluster's nested layout (auto-detected via the rgb/depth/cam
+#                       leaf markers). OmniObject3D falls back to scale=1.0 when
+#                       scale.json is absent (it is, on /jfs).
+#   * Waymo / Spring / MVS_Synth : split is metadata only; ROOT points at the
+#                       inner train/ dir where scenes actually live.
 #   * PointOdyssey    : loader uses ROOT/<split>/<scene>, so ROOT is the dir with
-#       train/test/val subdirs and split='train' picks the right one
+#                       train/test/val subdirs and split='train' picks the right one.
+# All loaders work in-place against /jfs/Data_4DFF/train_data/* without symlinks
+# or data duplication. The shared .uv-python venv on /jfs ships safetensors so
+# the .safetensor fallback resolves identically inside every worker container.
 
 dataset1: Co3d_Multi(allow_repeat=${allow_repeat}, split='train', ROOT='/jfs/Data_4DFF/train_data/co3d',
   aug_crop=16, resolution=[(518, 392), (518, 336), (518, 294), (518, 266), (518, 210), (518, 154), (392, 518), (336, 518), (294, 518), (266, 518)],
