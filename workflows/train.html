@@ -173,8 +173,13 @@
     <td><code>bootstrap_venv.sh</code> uses it to populate <code>/jfs/.../.venv</code>.</td>
   </tr>
   <tr>
-    <td>SSH key trust from head → all workers (no password prompt)</td>
-    <td><code>asyncssh.connect(..., known_hosts=None)</code> trusts-on-first-use but still needs a key.</td>
+    <td>Head → worker auth: SSH key trust <em>OR</em> <code>SSH_PASSWORD</code> env var</td>
+    <td>
+      Per <code>cluster.yaml#ssh</code> you set at least one of <code>identity_file</code> or
+      <code>password</code>. asyncssh tries key first, falls back to password. Use
+      <code>password: "${SSH_PASSWORD}"</code> and <code>export SSH_PASSWORD=...</code> to keep the
+      secret out of git. Literal passwords work but warn at load.
+    </td>
   </tr>
   <tr>
     <td><code>/jfs</code> mounted on every node at the same path</td>
@@ -308,19 +313,47 @@
   <li>Checks <code>uv</code> is on <code>$PATH</code> (exit 1 with install URL if missing).</li>
   <li>Verifies <code>/jfs</code> has ≥ 5 GB free (exit 2 if not — JuiceFS is shared, full disk hits everyone).</li>
   <li>Takes <code>flock -n .venv.lock</code> so a peer node can't race the same sync (exit 3 if held).</li>
+  <li>Sets <code>UV_PYTHON_INSTALL_DIR=&lt;repo&gt;/.uv-python</code> so the Python interpreter
+      lives on <code>/jfs</code> (bind-mountable into every worker container).</li>
+  <li>Detects + deletes any stale <code>.venv</code> whose <code>bin/python</code> symlinks
+      outside that directory (would crash inside docker with exit 127).</li>
   <li>Runs <code>uv sync --extra orchestrator --group dev</code>.</li>
+  <li>Asserts the venv's <code>bin/python</code> resolves under <code>.uv-python/</code>
+      (post-sync portability gate).</li>
   <li>Sanity-checks: <code>python -c "import torch, accelerate, asyncssh, click, yaml, rich"</code>.</li>
 </ol>
+
+<div class="callout danger">
+  <strong>Why <code>UV_PYTHON_INSTALL_DIR</code> matters</strong>
+  uv's default is <code>~/.local/share/uv/python/...</code>, which sits on local
+  <code>/home</code> (not <code>/jfs</code>). Worker containers bind-mount only
+  <code>/jfs</code>, so the venv's shebang
+  <code>#!/home/.../cpython-3.11/bin/python3.11</code>
+  becomes unreachable inside the container — kernel exec returns
+  <em>"required file not found"</em> and the worker exits 127. Installing
+  the interpreter onto <code>/jfs/.../.uv-python/</code> resolves identically
+  on every node.
+</div>
 
 <h3>Expected output</h3>
 <pre class="sample-output">[bootstrap] Repo root: /jfs/jing.feng/codebases/StreamVGGT
 [bootstrap] Venv path: /jfs/jing.feng/codebases/StreamVGGT/.venv
+[bootstrap] UV_PYTHON_INSTALL_DIR: /jfs/jing.feng/codebases/StreamVGGT/.uv-python
 [bootstrap] uv version: uv 0.4.x
 <span class="c-dim">Resolved 312 packages in 4.21s
 Built 5 wheels
 Installed 312 packages in 18s</span>
+[bootstrap] venv python -&gt; /jfs/jing.feng/codebases/StreamVGGT/.uv-python/cpython-3.11-linux-x86_64-gnu/bin/python3.11
 venv OK
 [bootstrap] Done. Activate with:  source /jfs/jing.feng/codebases/StreamVGGT/.venv/bin/activate</pre>
+
+<h3>Re-running is cheap</h3>
+<p>
+  The wheel cache at <code>~/.cache/uv/</code> survives <code>rm -rf .venv</code>.
+  A re-sync typically takes 2–5 min vs. 20 min for the cold case. To enforce
+  "no network fetch at all":
+</p>
+<pre><span class="c-dim">$</span> UV_OFFLINE=1 ./scripts/bootstrap_venv.sh</pre>
 
 <div class="callout warn">
   <strong>JuiceFS first-run latency</strong>
@@ -343,15 +376,18 @@ venv OK
 <summary>workflows/cluster.yaml (template — edit for your fleet)</summary>
 <pre>ssh:
   user: jing.feng
-  identity_file: ~/.ssh/id_ed25519
+  # Pick at least one auth method (asyncssh tries key first, then password):
+  identity_file: ~/.ssh/id_ed25519          # SSH key (preferred for prod)
+  # password: "${SSH_PASSWORD}"             # env-var interpolation (recommended for pw)
+  # password: "my-plaintext-pw"             # literal — WARNS at load
   connect_timeout_s: 5
 
-candidate_hosts:
-  - gpu003
-  - gpu004
-  - gpu005
-  - gpu006
-  - gpu007
+candidate_hosts:                            # hostnames OR IPs both work
+  - 172.31.208.3
+  - 172.31.208.4
+  - 172.31.208.5
+  - 172.31.208.6
+  - 172.31.208.7
   - gpu008
 
 docker:
@@ -384,8 +420,18 @@ train:
 </details>
 
 <h3>Run</h3>
-<pre><span class="c-dim">$</span> ./scripts/svggt-orch discover --dry-run    <span class="c-dim"># prints plan, no SSH</span>
+<pre><span class="c-dim">$</span> export SSH_PASSWORD='...'                  <span class="c-dim"># only if cluster.yaml uses password auth</span>
+<span class="c-dim">$</span> ./scripts/svggt-orch discover --dry-run    <span class="c-dim"># prints plan, no SSH</span>
 <span class="c-dim">$</span> ./scripts/svggt-orch discover              <span class="c-dim"># real fan-out</span></pre>
+
+<div class="callout">
+  <strong>SSH_PASSWORD must be in every shell that runs svggt-orch</strong>
+  The loader resolves <code>${SSH_PASSWORD}</code> at load time, so even
+  <code>--dry-run</code> needs it set. Per-invocation form works too:
+  <code>SSH_PASSWORD='...' ./scripts/svggt-orch discover</code>.
+  Missing the env var raises <em>RuntimeError: cluster.yaml references env var
+  ${SSH_PASSWORD} but it is not set</em> — clear, not silent.
+</div>
 
 <h3>What it does (per host, in parallel)</h3>
 <ol>
@@ -434,8 +480,28 @@ train:
 </p>
 
 <h3>Run</h3>
-<pre><span class="c-dim">$</span> ./scripts/svggt-orch launch --dry-run --exp-name StreamVGGT_alpha0.1_lr1e-5_nog
-<span class="c-dim">$</span> ./scripts/svggt-orch launch --exp-name StreamVGGT_alpha0.1_lr1e-5_nog</pre>
+<pre><span class="c-dim">$</span> export SSH_PASSWORD='...'  <span class="c-dim"># or rely on identity_file in cluster.yaml</span>
+
+<span class="c-dim"># Dry-run (offline): prints the plan; doesn't SSH or start docker</span>
+<span class="c-dim">$</span> ./scripts/svggt-orch launch --dry-run --exp-name StreamVGGT_alpha0.1_lr1e-5_nog
+
+<span class="c-dim"># Real launch — uses cluster.yaml#train.config_name (e.g. 'train')</span>
+<span class="c-dim">$</span> ./scripts/svggt-orch launch --exp-name StreamVGGT_alpha0.1_lr1e-5_nog
+
+<span class="c-dim"># Override the hydra config without editing cluster.yaml:</span>
+<span class="c-dim">$</span> ./scripts/svggt-orch launch --config-name train_smoke --exp-name SmokeRun
+<span class="c-dim">$</span> ./scripts/svggt-orch launch --config-name finetune    --exp-name VGGT_FT</pre>
+
+<div class="callout">
+  <strong>Three "config" levels, three flags</strong>
+  <ul style="margin: 4px 0;">
+    <li><code>--config workflows/cluster.yaml</code> — orchestrator cluster manifest (group-level, before subcommand)</li>
+    <li><code>--config-name train_smoke</code> — Hydra config under <code>config/</code> (launch-level)</li>
+    <li><code>--exp-name SmokeRun</code> — checkpoint/log subdir name (launch-level)</li>
+  </ul>
+  Dry-run output now includes <code>config_name:</code> as a row so the rendered plan is a
+  full reproducibility receipt.
+</div>
 
 <h3>How world size is computed</h3>
 <table>
@@ -453,7 +519,7 @@ train:
 <pre>cd /jfs/jing.feng/codebases/StreamVGGT \
   &amp;&amp; source scripts/lib/docker_env.sh \
   &amp;&amp; docker run -d --name svggt-&lt;jobid&gt; \
-       --gpus "device=0,1,2,3,4,5" \
+       --gpus '"device=0,1,2,3,4,5"' \                 <span class="c-dim"># nested quotes — see callout below</span>
        --env JOB_ID=&lt;jobid&gt; \
        --env EXP_NAME=StreamVGGT_alpha0.1_lr1e-5_nog \
        --env NUM_MACHINES=6  --env MACHINE_RANK=&lt;0..5&gt; \
@@ -467,6 +533,19 @@ train:
        "${DOCKER_RUN_FLAGS[@]}" \
        babiking/ubuntu:12.8.1-cudnn-devel-ubuntu24.04 \
        /workspace/scripts/worker_entry.sh</pre>
+
+<div class="callout danger">
+  <strong>Why <code>--gpus '"device=…"'</code> uses nested quotes</strong>
+  Some docker engines parse the bare form <code>--gpus device=0,1,2</code>
+  as setting <em>both</em> <code>Count</code> (from list length) and
+  <code>DeviceIDs</code>, then reject with:
+  <pre class="sample-output">docker: Error response from daemon: cannot set both Count and DeviceIDs on device request.</pre>
+  The outer single quotes survive the remote shell parsing, leaving docker
+  holding <code>"device=0,1,2"</code> as one literal argument that its parser
+  recognizes as device-IDs only. The orchestrator builds this form in
+  <code>_build_docker_cmd</code> and has a regression test
+  (<code>test_gpu_flag_uses_nested_quoting</code>) pinning the exact output.
+</div>
 
 <h3>Inside the container — <code>worker_entry.sh</code></h3>
 <ol>
@@ -665,10 +744,42 @@ per-host:
   <tr><td>Bootstrap</td><td><code>uv</code> missing</td><td>exit 1, prints install URL</td><td>install uv, rerun</td></tr>
   <tr><td>Bootstrap</td><td>/jfs &lt; 5 GB free</td><td>exit 2</td><td>clean up /jfs, rerun</td></tr>
   <tr><td>Bootstrap</td><td>flock contention</td><td>exit 3</td><td>wait for peer, or investigate stale lock</td></tr>
-  <tr><td>Discover</td><td>host unreachable</td><td>skip host, continue</td><td>nothing — pool members are best-effort</td></tr>
+  <tr>
+    <td>Bootstrap</td>
+    <td>Stale .venv with bin/python outside <code>.uv-python/</code></td>
+    <td>auto-detect + rebuild from scratch (wheel cache preserved)</td>
+    <td>nothing — happens transparently</td>
+  </tr>
+  <tr>
+    <td>Bootstrap</td>
+    <td>Post-sync gate: python doesn't resolve under <code>.uv-python/</code></td>
+    <td>exit 1 with explicit message</td>
+    <td>check <code>UV_PYTHON_INSTALL_DIR</code>; ensure repo on /jfs</td>
+  </tr>
+  <tr>
+    <td>Any subcommand</td>
+    <td><code>SSH_PASSWORD</code> env var missing while cluster.yaml has <code>password: "${SSH_PASSWORD}"</code></td>
+    <td><code>RuntimeError: cluster.yaml references env var ${SSH_PASSWORD} but it is not set</code></td>
+    <td><code>export SSH_PASSWORD='…'</code> or prefix each invocation</td>
+  </tr>
+  <tr><td>Discover</td><td>host unreachable</td><td>skip host, continue (silently — see below)</td><td>nothing — pool members are best-effort</td></tr>
   <tr><td>Discover</td><td>no idle GPUs anywhere</td><td>exit 2, no nodes.json written</td><td>wait or shrink other workloads</td></tr>
+  <tr><td>Discover</td><td>SSH password wrong / key not authorized</td><td><strong>silently dropped</strong> from nodes.json (asyncssh raises, <code>_probe_one_host</code> swallows)</td><td>test with <code>ssh user@ip</code> manually; future: add <code>--verbose</code> flag</td></tr>
+  <tr>
+    <td>Launch</td>
+    <td>docker: cannot set both Count and DeviceIDs</td>
+    <td>worker container exits non-zero, atomic abort</td>
+    <td>FIXED in <code>4ffbbbe</code>: <code>_build_docker_cmd</code> now emits <code>--gpus '"device=…"'</code> (nested quotes). If this resurfaces, check <code>git blame src/svggt_orch/launch.py</code>.</td>
+  </tr>
+  <tr>
+    <td>Launch</td>
+    <td>worker exits 127 — <code>accelerate: cannot execute: required file not found</code></td>
+    <td>atomic abort; <code>docker logs</code> shows the shebang path that's unreachable</td>
+    <td>FIXED in <code>a4419a2</code>: bootstrap installs uv-managed Python under <code>.uv-python/</code> on /jfs. If it resurfaces, run <code>readlink -f .venv/bin/python</code> — it must start with <code>/jfs/</code>.</td>
+  </tr>
   <tr><td>Launch</td><td>docker pull fails on one node</td><td><strong>abort all</strong> via docker rm, exit 3</td><td>pre-pull, rerun</td></tr>
   <tr><td>Launch</td><td>/jfs not mounted on a node</td><td>worker_entry exit 11, atomic abort</td><td>mount /jfs on the bad node</td></tr>
+  <tr><td>Launch</td><td><code>/workspace/.venv missing</code></td><td>worker_entry exit 12, atomic abort</td><td>re-run <code>./scripts/bootstrap_venv.sh</code> on head</td></tr>
   <tr><td>Launch</td><td>port 26902 in use</td><td>accelerate errors; abort all</td><td>edit <code>train.main_port</code> in cluster.yaml</td></tr>
   <tr><td>Training</td><td>CUDA OOM on any rank</td><td>NCCL_ASYNC_ERROR_HANDLING propagates abort; all ranks exit</td><td>reduce batch_size; rerun (auto-resume)</td></tr>
   <tr><td>Training</td><td>NaN loss</td><td>rank raises; cluster aborts</td><td>lower lr; rerun <em>without</em> resume (or it'll re-NaN)</td></tr>
@@ -688,12 +799,21 @@ per-host:
 
 <!-- ────────────────────────────────────────────── -->
 <h2 id="reference">11. CLI quick reference</h2>
+
+<p>
+  Every subcommand that SSHes (everything except <code>bootstrap_venv.sh</code>) needs
+  <code>SSH_PASSWORD</code> in the environment when <code>cluster.yaml#ssh</code> uses
+  <code>password: "${SSH_PASSWORD}"</code>. Either <code>export</code> it once or prefix
+  each command with <code>SSH_PASSWORD='…'</code>.
+</p>
+
 <table>
   <tr><th>Command</th><th>What it does</th><th>Exit codes</th></tr>
   <tr>
     <td><code>./scripts/bootstrap_venv.sh</code></td>
-    <td>Populate <code>.venv</code> via <code>uv sync --extra orchestrator --group dev</code></td>
-    <td>0 ok / 1 config / 2 ENOSPC / 3 flock</td>
+    <td>Populate <code>.venv</code> via <code>uv sync</code>; install Python under
+        <code>.uv-python/</code> on /jfs; honor <code>UV_OFFLINE=1</code></td>
+    <td>0 ok / 1 config or post-sync gate / 2 ENOSPC / 3 flock</td>
   </tr>
   <tr>
     <td><code>svggt-orch discover [--dry-run]</code></td>
@@ -701,8 +821,14 @@ per-host:
     <td>0 ok / 2 no nodes</td>
   </tr>
   <tr>
-    <td><code>svggt-orch launch [--dry-run] [--exp-name X]</code></td>
-    <td>Fan-out <code>docker run</code>; atomic abort on partial failure</td>
+    <td>
+      <code>svggt-orch launch [--dry-run] [--exp-name X] [--config-name Y]</code>
+    </td>
+    <td>
+      Fan-out <code>docker run</code>; atomic abort on partial failure.
+      <code>--config-name</code> overrides <code>cluster.yaml#train.config_name</code>
+      (e.g. <code>train_smoke</code>, <code>finetune</code>).
+    </td>
     <td>0 ok / 2 no nodes.json / 3 launch failed</td>
   </tr>
   <tr>
@@ -734,27 +860,107 @@ per-host:
 
 <!-- ────────────────────────────────────────────── -->
 <h2 id="smoke">12. L4 smoke checklist</h2>
-<p>Before declaring a multi-node bring-up complete, run these on the real cluster.
-   Each item is one terminal command + the expected observation.</p>
+<p>
+  Before declaring a multi-node bring-up complete, run these on the real cluster.
+  Each item is one terminal command + the expected observation. <strong>Order matters</strong>
+  — later steps depend on artifacts from earlier ones.
+</p>
+
+<p>Prelude (set up once per shell):</p>
+<pre><span class="c-dim">$</span> cd /jfs/jing.feng/codebases/StreamVGGT
+<span class="c-dim">$</span> export SSH_PASSWORD='...'   <span class="c-dim"># only if cluster.yaml uses password auth</span></pre>
 
 <table>
-  <tr><th>Step</th><th>Expectation</th></tr>
-  <tr><td><code>./scripts/svggt-orch discover</code></td><td>Both/all nodes reported; idle GPU count matches manual <code>nvidia-smi</code>.</td></tr>
-  <tr><td><code>./scripts/svggt-orch launch --exp-name StreamVGGT_smoke</code></td><td>Exit 0; <code>workflows/jobs/&lt;id&gt;/manifest.json</code> exists; world size matches expectation.</td></tr>
-  <tr><td><code>./scripts/svggt-orch tail --job &lt;id&gt;</code></td><td>Interleaved logs from all ranks; per-step <code>loss</code> printing within 1–2 min of launch.</td></tr>
-  <tr><td><code>./scripts/svggt-orch monitor --job &lt;id&gt;</code></td><td>GPU util &gt; 0 within ~1 min; IB tx/rx columns &gt; 0 GB/s once training starts.</td></tr>
-  <tr><td>Wait one <code>save_freq</code> epoch</td><td><code>checkpoints/StreamVGGT_smoke/checkpoint-last.pth</code> exists and <code>torch.load</code>s.</td></tr>
-  <tr><td><code>./scripts/svggt-orch kill --job &lt;id&gt; --yes</code></td><td>Containers gone within 5 s on every node; manifest <code>status: "killed"</code>.</td></tr>
-  <tr><td>Re-run <code>launch</code></td><td>train.py logs "Resuming from checkpoint-last.pth".</td></tr>
-  <tr><td>Crash injection: <code>docker kill svggt-&lt;id&gt;</code> on one node</td><td>Surviving ranks exit within 30 s (<strong>not</strong> 100 min) — proves <code>NCCL_ASYNC_ERROR_HANDLING=1</code>.</td></tr>
-  <tr><td>Heartbeat: <code>touch -d '-20 min' &lt;exp&gt;/heartbeat</code></td><td><code>monitor</code> TUI banner flips red and per-row status reads <code>STALE HEARTBEAT</code>.</td></tr>
-  <tr><td>Post-cleanup: <code>./scripts/svggt-orch discover</code></td><td>All GPUs idle again across all hosts.</td></tr>
+  <tr><th>#</th><th>Step</th><th>Expectation</th></tr>
+  <tr>
+    <td>1</td>
+    <td><code>./scripts/bootstrap_venv.sh</code></td>
+    <td>
+      Prints <code>[bootstrap] venv python -&gt; /jfs/.../.uv-python/cpython-3.11-…</code>;
+      ends with <code>venv OK</code> and exit 0.
+    </td>
+  </tr>
+  <tr>
+    <td>2</td>
+    <td><code>./scripts/svggt-orch discover</code></td>
+    <td>
+      <code>workflows/nodes.json</code> lists every reachable node with idle GPU counts
+      matching manual <code>nvidia-smi</code>.
+    </td>
+  </tr>
+  <tr>
+    <td>3</td>
+    <td><code>./scripts/svggt-orch launch --config-name train_smoke --exp-name StreamVGGT_smoke</code></td>
+    <td>
+      Exits 0; <code>workflows/jobs/&lt;id&gt;/manifest.json</code> exists with the right
+      <code>world_size</code>; <code>docker ps -f name=svggt-</code> on each worker shows the
+      container running.
+    </td>
+  </tr>
+  <tr>
+    <td>4</td>
+    <td><code>./scripts/svggt-orch tail --job &lt;id&gt;</code></td>
+    <td>
+      Interleaved <code>[r=NN h=…]</code> lines from every rank within ~1 min;
+      <code>loss:</code> printing within 3-5 min.
+    </td>
+  </tr>
+  <tr>
+    <td>5</td>
+    <td><code>./scripts/svggt-orch monitor --job &lt;id&gt;</code></td>
+    <td>GPU <code>sm %</code> &gt; 0 within ~60 s; IB tx/rx columns &gt; 0 GB/s once training starts.</td>
+  </tr>
+  <tr>
+    <td>6</td>
+    <td>Wait one <code>save_freq</code> epoch</td>
+    <td>
+      <code>checkpoints/StreamVGGT_smoke/checkpoint-last.pth</code> exists, is non-empty,
+      <code>torch.load</code>s without error.
+    </td>
+  </tr>
+  <tr>
+    <td>7</td>
+    <td><code>./scripts/svggt-orch kill --job &lt;id&gt; --yes</code></td>
+    <td>
+      All containers gone within ~5 s on every node;
+      <code>manifest.json#status == "killed"</code>.
+    </td>
+  </tr>
+  <tr>
+    <td>8</td>
+    <td>Re-run <code>launch</code></td>
+    <td>train.py logs <em>"Resuming from checkpoint-last.pth"</em>; continues from step-6 state.</td>
+  </tr>
+  <tr>
+    <td>9</td>
+    <td>Crash injection: SSH to a worker and run <code>docker kill svggt-&lt;id&gt;</code></td>
+    <td>
+      Surviving ranks exit within ~30 s (<strong>not</strong> the 100 min NCCL timeout).
+      Proves <code>NCCL_ASYNC_ERROR_HANDLING=1</code> is wired up.
+    </td>
+  </tr>
+  <tr>
+    <td>10</td>
+    <td><code>touch -d '-20 min' /jfs/.../checkpoints/StreamVGGT_smoke/heartbeat</code></td>
+    <td><code>monitor</code> TUI banner flips red; per-row status reads <code>STALE HEARTBEAT</code>.</td>
+  </tr>
+  <tr>
+    <td>11</td>
+    <td>Post-cleanup: <code>./scripts/svggt-orch discover</code></td>
+    <td>Every GPU on every node is reported idle again.</td>
+  </tr>
 </table>
 
+<p>If all 11 steps pass, tag the milestone:</p>
+<pre><span class="c-dim">$</span> git tag -a v0.1.0-orch -m "StreamVGGT multi-node orchestrator initial release"</pre>
+
 <footer>
-  StreamVGGT multi-node distillation walkthrough · branch
-  <code>feature/multinode-orchestrator</code>
-  · designed against <code>workflows/cluster.yaml</code> with 6 × A100 PCIe / node, IB HDR100 on <code>mlx5_1</code>.
+  StreamVGGT multi-node distillation walkthrough ·
+  current branch <code>dev/bbk/uv</code> ·
+  designed against <code>workflows/cluster.yaml</code>
+  with mixed 8 × / 6 × / 2 × A100 PCIe nodes,
+  IB HDR100 on <code>mlx5_1</code>,
+  uv-managed Python on <code>/jfs/.../.uv-python</code>.
 </footer>
 </div>
 </body>
