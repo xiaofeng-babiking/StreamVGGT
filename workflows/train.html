@@ -131,6 +131,7 @@
     <li><a href="#errors">Error handling &amp; recovery</a></li>
     <li><a href="#reference">CLI quick reference</a></li>
     <li><a href="#smoke">L4 smoke checklist</a></li>
+    <li><a href="#loader-patches">Cluster-specific loader patches</a></li>
   </ol>
 </div>
 
@@ -643,6 +644,17 @@ launch: started ok. Manifest: workflows/jobs/20260525-162300/manifest.json</pre>
   "rank silently hung; NCCL won't timeout for 100 minutes" failure mode.
 </p>
 
+<div class="callout">
+  <strong>Datasets live in-place on /jfs</strong>
+  Workers read training data straight from
+  <code>/jfs/Data_4DFF/train_data/&lt;dataset&gt;/</code> via the bind-mount — no
+  symlinks, no preprocessed mirrors. Three dataset loaders were patched
+  to handle this cluster's data layout quirks (BlendedMVS/MegaDepth use
+  <code>.safetensor</code> camera params, OmniObject3D has an extra category
+  nesting level). See <a href="#loader-patches">§13 Cluster-specific loader
+  patches</a> for details.
+</div>
+
 <!-- ────────────────────────────────────────────── -->
 <h2 id="phase-e"><span class="phase-badge e">E</span> Phase E — Monitoring (3 layers)</h2>
 
@@ -781,6 +793,38 @@ per-host:
   <tr><td>Launch</td><td>/jfs not mounted on a node</td><td>worker_entry exit 11, atomic abort</td><td>mount /jfs on the bad node</td></tr>
   <tr><td>Launch</td><td><code>/workspace/.venv missing</code></td><td>worker_entry exit 12, atomic abort</td><td>re-run <code>./scripts/bootstrap_venv.sh</code> on head</td></tr>
   <tr><td>Launch</td><td>port 26902 in use</td><td>accelerate errors; abort all</td><td>edit <code>train.main_port</code> in cluster.yaml</td></tr>
+  <tr>
+    <td>Training</td>
+    <td>Dataset rank-0 raises FileNotFoundError on a per-frame <code>.npz</code></td>
+    <td>rank exits non-zero, peers abort within ~30 s</td>
+    <td>
+      FIXED in <code>77ba367</code>: BlendedMVS / MegaDepth loaders read
+      <code>.safetensor</code> when <code>.npz</code> is absent. If it resurfaces, verify
+      <code>config/train_distribute.yaml</code> passes <code>data_format='safetensor'</code>
+      (or <code>'auto'</code>) for those datasets. See <a href="#loader-patches">§13</a>.
+    </td>
+  </tr>
+  <tr>
+    <td>Training</td>
+    <td>OmniObject3D loader reports "no scenes found" or zero-length iterator</td>
+    <td>training crashes at dataloader init</td>
+    <td>
+      FIXED in <code>d8132a9</code>: loader walks the <code>cat/inst</code> nesting under ROOT.
+      Verify <code>nested_layout=True</code> (or <code>'auto'</code>) is set in
+      <code>train_distribute.yaml</code> for OmniObject3D_Multi. See <a href="#loader-patches">§13</a>.
+    </td>
+  </tr>
+  <tr>
+    <td>Training</td>
+    <td>OmniObject3D depth scale looks wrong</td>
+    <td>training proceeds but absolute depth is in raw units (no warning)</td>
+    <td>
+      Expected on this cluster: <code>scale.json</code> is absent so the loader
+      falls back to scale=1.0. Distillation loss is largely scale-invariant
+      so it's usually fine. If you need precise metric scale, generate a
+      <code>scale.json</code> per the upstream preprocessing pipeline.
+    </td>
+  </tr>
   <tr><td>Training</td><td>CUDA OOM on any rank</td><td>NCCL_ASYNC_ERROR_HANDLING propagates abort; all ranks exit</td><td>reduce batch_size; rerun (auto-resume)</td></tr>
   <tr><td>Training</td><td>NaN loss</td><td>rank raises; cluster aborts</td><td>lower lr; rerun <em>without</em> resume (or it'll re-NaN)</td></tr>
   <tr><td>Training</td><td>Node hardware fail mid-run</td><td>rank silent → NCCL timeout (100 min)</td><td>monitor's heartbeat banner fires at 10 min; you kill</td></tr>
@@ -953,6 +997,111 @@ per-host:
 
 <p>If all 11 steps pass, tag the milestone:</p>
 <pre><span class="c-dim">$</span> git tag -a v0.1.0-orch -m "StreamVGGT multi-node orchestrator initial release"</pre>
+
+<!-- ────────────────────────────────────────────── -->
+<h2 id="loader-patches">13. Cluster-specific loader patches</h2>
+
+<p>
+  This cluster's preprocessed training data deviates from upstream's expected
+  layout in two ways, both rooted in a parallel preprocessing pipeline that
+  wasn't synced with the dust3r repo's <code>datasets_preprocess/</code> scripts.
+  Rather than re-preprocess hundreds of GB on a 96 %-full <code>/jfs</code>,
+  the loader code learned to read what's actually there.
+</p>
+
+<table>
+  <tr>
+    <th>Issue</th>
+    <th>Affected datasets</th>
+    <th>Fix</th>
+    <th>Commit</th>
+  </tr>
+  <tr>
+    <td>
+      Per-frame cam params serialized as <code>.safetensor</code> instead of <code>.npz</code>
+    </td>
+    <td>BlendedMVS, MegaDepth</td>
+    <td>
+      Loaders accept <code>data_format='auto'</code> | <code>'npz'</code> | <code>'safetensor'</code>.
+      Default <code>'auto'</code> tries <code>.npz</code> first then falls back; both formats yield
+      structurally equivalent dicts.
+    </td>
+    <td><code>77ba367</code></td>
+  </tr>
+  <tr>
+    <td>
+      Extra <code>&lt;category&gt;/&lt;instance&gt;</code> nesting under ROOT
+    </td>
+    <td>OmniObject3D</td>
+    <td>
+      <code>OmniObject3D_Multi</code> accepts <code>nested_layout='auto'</code> | <code>True</code> | <code>False</code>.
+      <code>'auto'</code> uses leaf markers (<code>rgb</code>, <code>depth</code>, <code>cam</code> subdirs) to detect
+      depth. Also: <code>scale.json</code> is now optional, falling back to scale=1.0 per scene.
+    </td>
+    <td><code>d8132a9</code></td>
+  </tr>
+  <tr>
+    <td>
+      <em>False alarm</em>: 3-level <code>Scene/&lt;weather&gt;/&lt;cam&gt;/</code> nesting
+    </td>
+    <td>VKITTI2</td>
+    <td>
+      <code>VirtualKITTI2_Multi</code> was already nested-aware in upstream
+      (walks the three levels at lines 27–46 and 57). No code change.
+      The earlier preprocess-status verifier had a shallow-walk bug.
+    </td>
+    <td>— (no commit)</td>
+  </tr>
+</table>
+
+<h3>Shared helper: <code>src/dust3r/datasets/_io.py</code></h3>
+<p>One small private module factors out the cluster-specific I/O patterns:</p>
+<pre><span class="c-dim"># Format dispatch</span>
+load_cam_params(stem, data_format='auto'|'npz'|'safetensor')
+   <span class="c-dim"># 'auto' prefers .npz, falls through to .safetensor</span>
+   <span class="c-dim"># explicit modes raise FileNotFoundError on absence</span>
+
+<span class="c-dim"># Layout walkers</span>
+walk_nested_scenes(root, depth)   <span class="c-dim"># depth=1: flat; depth=2: cat/inst; depth=3: scene/weather/cam</span>
+detect_layout_depth(root)          <span class="c-dim"># probes for rgb/depth/cam subdir markers</span>
+list_subdirs(root)                 <span class="c-dim"># sorted, dirs only, swallows perm errors</span></pre>
+
+<h3>Declarative config (explicit kwargs in <code>train_distribute.yaml</code>)</h3>
+<p>
+  The cluster's choices are spelled out in the yaml rather than relying on
+  auto-detection, so the config doubles as documentation:
+</p>
+<pre>dataset8:  BlendedMVS_Multi(..., ROOT='/jfs/.../blendedmvs',  <span class="c-y">data_format='safetensor'</span>, ...)
+dataset9:  MegaDepth_Multi(..., ROOT='/jfs/.../megadepth',   <span class="c-y">data_format='safetensor'</span>, ...)
+dataset12: OmniObject3D_Multi(..., ROOT='/jfs/.../omniobject3d/train', <span class="c-y">nested_layout=True</span>, ...)</pre>
+
+<div class="callout">
+  <strong>Why explicit kwargs instead of <code>'auto'</code></strong>
+  Auto-detection is a defensive default that keeps upstream-format data
+  loadable by the same code. Pinning the value in the yaml is a stronger
+  declaration of intent: a stray <code>.npz</code> dropped next to the
+  <code>.safetensor</code> files won't change behavior, and a future re-preprocess
+  flips behavior via a single visible toggle, not via filesystem state.
+</div>
+
+<h3>Unit tests</h3>
+<p>
+  <code>tests/unit/test_dataset_io.py</code> — 12 tests covering the format
+  dispatch (prefers npz, falls back to safetensor, explicit modes, missing
+  both, invalid input) and the layout walkers (depth 1/2/3, sorted order,
+  invalid depth, auto-detect from leaf markers). All pass without the
+  training stack installed — imports via <code>importlib</code> bypass
+  <code>dust3r.datasets.__init__</code>'s torch/accelerate dependencies.
+</p>
+
+<h3>Files touched</h3>
+<pre>src/dust3r/datasets/_io.py            NEW     137 LoC  (helper + walker)
+src/dust3r/datasets/blendedmvs.py     EDIT      +5 LoC  (use load_cam_params)
+src/dust3r/datasets/megadepth.py      EDIT      +6 LoC  (use load_cam_params)
+src/dust3r/datasets/omniobject3d.py   EDIT     +20 LoC  (nested walk + scale fallback)
+src/dust3r/datasets/vkitti2.py        no-op            (already nested-aware)
+tests/unit/test_dataset_io.py         NEW     133 LoC  (12 tests)
+config/train_distribute.yaml          EDIT     +3 LoC  (explicit kwargs)</pre>
 
 <footer>
   StreamVGGT multi-node distillation walkthrough ·
