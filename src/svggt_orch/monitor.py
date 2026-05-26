@@ -34,7 +34,7 @@ class HostSample:
 
 
 _DMON_TAIL_CMD = (
-    "tail -n 200 /workspace/workflows/jobs/{job}/dmon-$(hostname -s).csv 2>/dev/null"
+    "tail -n 200 {repo}/workflows/jobs/{job}/dmon-$(hostname -s).csv 2>/dev/null"
 )
 
 _IB_COUNTERS_CMD = (
@@ -107,7 +107,9 @@ async def _sample_one(
     try:
         async with asyncssh.connect(host, **asyncssh_connect_kwargs(cfg)) as conn:
             dmon = await conn.run(
-                _DMON_TAIL_CMD.format(job=job_id), check=False, timeout=10
+                _DMON_TAIL_CMD.format(repo=cfg.paths.repo, job=job_id),
+                check=False,
+                timeout=10,
             )
             ib = await conn.run(_IB_COUNTERS_CMD, check=False, timeout=5)
             utils, mems, temps = _parse_dmon_tail(str(dmon.stdout or ""))

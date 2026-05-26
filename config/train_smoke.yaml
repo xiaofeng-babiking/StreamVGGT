@@ -22,7 +22,7 @@ dataset1: Co3d_Multi(allow_repeat=${allow_repeat}, split='train', ROOT='/jfs/Dat
   transform=SeqColorJitter, num_views=${num_views}, n_corres=${n_corres_train})
 
 train_dataset: 100 @ ${dataset1}
-test_dataset: 20 @ ARKitScenes_Multi(split='Test', ROOT='/jfs/Data_4DFF/train_data/arkitscenes', resolution=(518, 392), num_views=${num_test_views}, seed=42, n_corres=${n_corres_test})
+test_dataset: 20 @ Co3d_Multi(allow_repeat=${allow_repeat}, split='test', ROOT='/jfs/Data_4DFF/train_data/co3d', resolution=(518, 392), num_views=${num_test_views}, seed=42, n_corres=${n_corres_test})
 
 seed: 0
 batch_size: 1
